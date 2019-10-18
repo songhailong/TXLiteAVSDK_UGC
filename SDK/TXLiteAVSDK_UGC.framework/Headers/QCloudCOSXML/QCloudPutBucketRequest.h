@@ -28,6 +28,12 @@
 #import <Foundation/Foundation.h>
 #import <QCloudCore/QCloudCore.h>
 NS_ASSUME_NONNULL_BEGIN
+
+/**
+ Put Bucket 接口请求可以在指定账号下创建一个 Bucket。该 API 接口不支持匿名请求，您需要使用帯 Authorization 签名认证的请求才能创建新的 Bucket 。创建 Bucket 的用户默认成为 Bucket 的持有者。
+ 
+ 创建 Bucket 时，如果没有指定访问权限，则默认使用私有读写（private）权限。
+ */
 @interface QCloudPutBucketRequest : QCloudBizHTTPRequest
 /**
 定义 Object 的 ACL 属性。有效值：private，public-read-write，public-read；默认值：private

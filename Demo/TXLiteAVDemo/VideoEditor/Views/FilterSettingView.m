@@ -32,9 +32,6 @@ typedef NS_ENUM(NSInteger,TCLVFilterType) {
     V8HorizontalPickerView *        _filterPickerView;
     NSMutableArray *                _filterArray;       //滤镜列表数据
     NSInteger                       _filterIndex;
-    UILabel*                        _titleLabel;        //标题label
-    
-    
     /*美颜功能，需要再打开*/
 //    UIButton*     _beautyBtn;
 //    UIView*       _beautyView;
@@ -126,13 +123,6 @@ typedef NS_ENUM(NSInteger,TCLVFilterType) {
 
 - (void)initUI
 {
-    self.backgroundColor = UIColor.blackColor;
-    _titleLabel = [[UILabel alloc] init];
-    _titleLabel.text = @"视频滤镜";
-    _titleLabel.textAlignment = NSTextAlignmentCenter;
-    _titleLabel.textColor = UIColorFromRGB(0x777777);
-    [self addSubview:_titleLabel];
-    
     _filterPickerView = [[V8HorizontalPickerView alloc] init];
     _filterPickerView.textColor = [UIColor grayColor];
     _filterPickerView.elementFont = [UIFont fontWithName:@"" size:14];
@@ -198,10 +188,9 @@ typedef NS_ENUM(NSInteger,TCLVFilterType) {
 {
     [super layoutSubviews];
     
-    _titleLabel.frame = CGRectMake(0, 0, self.width, 14);
 //    _beautyBtn.frame = CGRectMake(5, _titleLabel.bottom + 50 * kScaleY, 82, 120);
     
-    _filterPickerView.frame = CGRectMake( 5, _titleLabel.bottom + 50 * kScaleY, self.width - 10, 120);
+    _filterPickerView.frame = CGRectMake( 5, 50 * kScaleY, self.width - 10, 120 * kScaleY);
     [_filterPickerView scrollToElement:_filterIndex animated:NO];
     
 //    _beautyView.frame = _filterPickerView.frame;

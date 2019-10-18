@@ -31,6 +31,7 @@
 
 @class QCloudCOSXMLService;
 @class QCloudCOSXMLUploadObjectRequest;
+@class QCloudCOSXMLCopyObjectRequest;
 @interface QCloudCOSTransferMangerService : QCloudService
 @property (nonatomic, strong, readonly) QCloudCOSXMLService* cosService;
 #pragma hidden super selectors
@@ -40,8 +41,9 @@
 #pragma Factory
 + (QCloudCOSTransferMangerService*) defaultCOSTransferManager;
 + (QCloudCOSTransferMangerService*) costransfermangerServiceForKey:(NSString*)key;
-+ (QCloudCOSTransferMangerService*) registerdefaultCOSTransferManagerWithConfiguration:(QCloudServiceConfiguration*)configuration;
++ (QCloudCOSTransferMangerService*) registerDefaultCOSTransferMangerWithConfiguration:(QCloudServiceConfiguration*)configuration;
 + (QCloudCOSTransferMangerService*) registerCOSTransferMangerWithConfiguration:(QCloudServiceConfiguration*)configuration withKey:(NSString*)key;
 
 - (void) UploadObject:(QCloudCOSXMLUploadObjectRequest*)upload;
+- (void) CopyObject:(QCloudCOSXMLCopyObjectRequest*)copy;
 @end

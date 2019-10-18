@@ -9,7 +9,7 @@
 #import "VideoEditPrevController.h"
 //#import "TCVideoPublishController.h"
 #import "VideoPreviewViewController.h"
-#import <TXRTMPSDK/TXVideoEditer.h>
+#import "TXVideoEditer.h"
 #import "MBProgressHUD.h"
 #import "ColorMacro.h"
 #import "UIView+Additions.h"
@@ -38,6 +38,7 @@ typedef  NS_ENUM(NSInteger,ActionType)
     UILabel*        _generationTitleLabel;
     UIView*         _generationView;
     UIProgressView* _generateProgressView;
+    UIButton*       _generateCannelBtn;
 }
 
 
@@ -87,13 +88,25 @@ typedef  NS_ENUM(NSInteger,ActionType)
         _generationTitleLabel.textAlignment = NSTextAlignmentCenter;
         _generationTitleLabel.frame = CGRectMake(0, _generateProgressView.y - 34, _generationView.width, 14);
         
+        _generateCannelBtn = [UIButton new];
+        [_generateCannelBtn setImage:[UIImage imageNamed:@"cancel"] forState:UIControlStateNormal];
+        _generateCannelBtn.frame = CGRectMake(_generateProgressView.right + 15, _generationTitleLabel.bottom + 10, 20, 20);
+        [_generateCannelBtn addTarget:self action:@selector(onGenerateCancelBtnClicked:) forControlEvents:UIControlEventTouchUpInside];
+        
         [_generationView addSubview:_generationTitleLabel];
         [_generationView addSubview:_generateProgressView];
+        [_generationView addSubview:_generateCannelBtn];
         [[[UIApplication sharedApplication] delegate].window addSubview:_generationView];
     }
     
     _generateProgressView.progress = 0.f;
     return _generationView;
+}
+
+- (void)onGenerateCancelBtnClicked:(UIButton*)sender
+{
+    _generationView.hidden = YES;
+    [_ugcJoin cancelJoin];
 }
 
 - (void)checkOutFilePath
@@ -124,7 +137,7 @@ typedef  NS_ENUM(NSInteger,ActionType)
 - (void)viewDidAppear:(BOOL)animated{
     [super viewDidAppear:animated];
     
-    _videoPreview = [[VideoPreview alloc] initWithFrame:CGRectMake(0, 0, self.prevPlaceHolder.width, self.prevPlaceHolder.height) coverImage:[TXVideoInfoReader getVideoInfo:_composeArray.firstObject].coverImage];
+    _videoPreview = [[VideoPreview alloc] initWithFrame:CGRectMake(0, 0, self.prevPlaceHolder.width, self.prevPlaceHolder.height) coverImage:[TXVideoInfoReader getVideoInfoWithAsset:_composeArray.firstObject].coverImage];
     _videoPreview.delegate = self;
     [self.prevPlaceHolder addSubview:_videoPreview];
 
@@ -133,7 +146,7 @@ typedef  NS_ENUM(NSInteger,ActionType)
     param.videoView = _videoPreview.renderView;
     param.renderMode = PREVIEW_RENDER_MODE_FILL_EDGE;
     _ugcJoin = [[TXVideoJoiner alloc] initWithPreview:param];
-    [_ugcJoin setVideoPathList:_composeArray];
+    [_ugcJoin setVideoAssetList:_composeArray];
     _ugcJoin.previewDelegate = _videoPreview;
     _ugcJoin.joinerDelegate = self;
     [self play];
@@ -141,6 +154,7 @@ typedef  NS_ENUM(NSInteger,ActionType)
 
 - (void)viewDidDisappear:(BOOL)animated
 {
+    [super viewDidDisappear:animated];
     [_ugcJoin pausePlay];
 }
 
@@ -191,6 +205,8 @@ typedef  NS_ENUM(NSInteger,ActionType)
 
 - (void)onVideoEnterBackground
 {
+    [MBProgressHUD hideHUDForView:self.view animated:YES];
+    [self onVideoPause];
     if (_generationView && !_generationView.hidden) {
         _generationView.hidden = YES;
         [_ugcJoin cancelJoin];
@@ -215,7 +231,7 @@ typedef  NS_ENUM(NSInteger,ActionType)
 //            [self performSelector:@selector(video:didFinishSavingWithError:contextInfo:) withObject:nil];
 //        }
         TXVideoInfo *videoInfo = [TXVideoInfoReader getVideoInfo:_outFilePath];
-        VideoPreviewViewController* vc = [[VideoPreviewViewController alloc] initWithCoverImage:videoInfo.coverImage videoPath:_outFilePath];
+        VideoPreviewViewController* vc = [[VideoPreviewViewController alloc] initWithCoverImage:videoInfo.coverImage videoPath:_outFilePath renderMode:RENDER_MODE_FILL_EDGE isFromRecord:NO];
         [self.navigationController pushViewController:vc animated:YES];
     }else{
 //        [MBProgressHUD hideAllHUDsForView:self.view animated:YES];

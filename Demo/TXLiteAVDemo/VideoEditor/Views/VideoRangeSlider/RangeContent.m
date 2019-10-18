@@ -19,6 +19,7 @@
         _thumbHeight = THUMB_HEIGHT;
         _borderHeight = BORDER_HEIGHT;
         _leftPinImage = [UIImage imageNamed:@"left"];
+        _centerPinImage = [UIImage imageNamed:@"center"];
         _rightPigImage = [UIImage imageNamed:@"right"];
     }
     
@@ -128,6 +129,18 @@
         imageView;
     });
     
+    self.centerPin = ({
+        UIImageView *imageView = [[UIImageView alloc] initWithImage:_appearanceConfig.centerPinImage];
+        imageView.contentMode = UIViewContentModeScaleToFill;
+        imageView.width = _appearanceConfig.pinWidth;
+        [self addSubview:imageView];
+        imageView.userInteractionEnabled = YES;
+        UIPanGestureRecognizer *panGes = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleCenterPan:)];
+        [imageView addGestureRecognizer:panGes];
+        imageView;
+    });
+    self.centerPin.hidden = YES;
+    
     self.rightPin = ({
         UIImageView *imageView = [[UIImageView alloc] initWithImage:_appearanceConfig.rightPigImage];
         imageView.contentMode = UIViewContentModeScaleToFill;
@@ -153,8 +166,9 @@
         view;
     });
     
-    self.leftPinCenterX = _appearanceConfig.pinWidth / 2;
-    self.rightPinCenterX = frame.size.width- _appearanceConfig.pinWidth / 2;
+    _leftPinCenterX = _appearanceConfig.pinWidth / 2;
+    _centerPinCenterX = frame.size.width / 2;
+    _rightPinCenterX = frame.size.width- _appearanceConfig.pinWidth / 2;
 }
 
 - (CGSize)intrinsicContentSize {
@@ -165,6 +179,7 @@
     [super layoutSubviews];
     
     self.leftPin.center = CGPointMake(self.leftPinCenterX, self.height / 2);
+    self.centerPin.center = CGPointMake(self.centerPinCenterX, self.height / 2);
     self.rightPin.center = CGPointMake(self.rightPinCenterX, self.height / 2);
     
     self.topBorder.height = _appearanceConfig.borderHeight;
@@ -205,10 +220,17 @@
         if (_leftPinCenterX < _appearanceConfig.pinWidth / 2) {
             _leftPinCenterX = _appearanceConfig.pinWidth / 2;
         }
-        if (_rightPinCenterX - _leftPinCenterX <= _appearanceConfig.pinWidth) {
-            _leftPinCenterX = _rightPinCenterX - _appearanceConfig.pinWidth;
-        }
         
+        if (_centerPin.isHidden){
+            if (_rightPinCenterX - _leftPinCenterX <= _appearanceConfig.pinWidth) {
+                _leftPinCenterX = _rightPinCenterX - _appearanceConfig.pinWidth;
+            }
+        }else{
+            if (_centerPinCenterX - _leftPinCenterX <= _appearanceConfig.pinWidth) {
+                _leftPinCenterX = _centerPinCenterX - _appearanceConfig.pinWidth;
+            }
+        }
+  
         [gesture setTranslation:CGPointZero inView:self];
         
         [self setNeedsLayout];
@@ -229,6 +251,40 @@
     }
 }
 
+- (void)handleCenterPan:(UIPanGestureRecognizer *)gesture
+{
+    if (gesture.state == UIGestureRecognizerStateBegan || gesture.state == UIGestureRecognizerStateChanged || gesture.state == UIGestureRecognizerStateEnded) {
+        
+        CGPoint translation = [gesture translationInView:self];
+        
+        _centerPinCenterX += translation.x;
+        if (_centerPinCenterX < _leftPinCenterX + _appearanceConfig.pinWidth) {
+            _centerPinCenterX = _leftPinCenterX + _appearanceConfig.pinWidth;
+        }
+        if (_centerPinCenterX > _rightPinCenterX - _appearanceConfig.pinWidth) {
+            _centerPinCenterX = _rightPinCenterX - _appearanceConfig.pinWidth;
+        }
+        
+        [gesture setTranslation:CGPointZero inView:self];
+        
+        [self setNeedsLayout];
+        
+        if (gesture.state == UIGestureRecognizerStateBegan) {
+            if ([self.delegate respondsToSelector:@selector(onRangeCenterChangeBegin:)])
+                [self.delegate onRangeCenterChangeBegin:self];
+        }
+        else if (gesture.state == UIGestureRecognizerStateChanged){
+            if ([self.delegate respondsToSelector:@selector(onRangeCenterChanged:)])
+                [self.delegate onRangeCenterChanged:self];
+        }
+        else {
+            if ([self.delegate respondsToSelector:@selector(onRangeCenterChangeEnded:)])
+                [self.delegate onRangeCenterChangeEnded:self];
+        }
+        
+    }
+}
+
 
 - (void)handleRightPan:(UIPanGestureRecognizer *)gesture
 {
@@ -240,8 +296,15 @@
         if (_rightPinCenterX > self.width - _appearanceConfig.pinWidth / 2) {
             _rightPinCenterX = self.width - _appearanceConfig.pinWidth / 2;
         }
-        if (_rightPinCenterX-_leftPinCenterX <= _appearanceConfig.pinWidth) {
-            _rightPinCenterX = _leftPinCenterX + _appearanceConfig.pinWidth;
+        
+        if (_centerPin.isHidden) {
+            if (_rightPinCenterX-_leftPinCenterX <= _appearanceConfig.pinWidth) {
+                _rightPinCenterX = _leftPinCenterX + _appearanceConfig.pinWidth;
+            }
+        }else{
+            if (_rightPinCenterX-_centerPinCenterX <= _appearanceConfig.pinWidth) {
+                _rightPinCenterX = _centerPinCenterX + _appearanceConfig.pinWidth;
+            }
         }
         
         [gesture setTranslation:CGPointZero inView:self];
@@ -265,30 +328,30 @@
 }
 
 
-- (void)handleCenterPan:(UIPanGestureRecognizer *)gesture
-{
-    
-    if (gesture.state == UIGestureRecognizerStateBegan || gesture.state == UIGestureRecognizerStateChanged) {
-        
-        CGPoint translation = [gesture translationInView:self];
-        
-        _leftPinCenterX += translation.x;
-        _rightPinCenterX += translation.x;
-        
-        if (_rightPinCenterX > self.width - _appearanceConfig.pinWidth || _leftPinCenterX < _appearanceConfig.pinWidth / 2){
-            _leftPinCenterX -= translation.x;
-            _rightPinCenterX -= translation.x;
-        }
-        
-        [gesture setTranslation:CGPointZero inView:self];
-        
-        [self setNeedsLayout];
-        
-        if ([self.delegate respondsToSelector:@selector(onRangeLeftAndRightChanged:)])
-            [self.delegate onRangeLeftAndRightChanged:self];
-        
-    }
-}
+//- (void)handleCenterPan:(UIPanGestureRecognizer *)gesture
+//{
+//
+//    if (gesture.state == UIGestureRecognizerStateBegan || gesture.state == UIGestureRecognizerStateChanged) {
+//
+//        CGPoint translation = [gesture translationInView:self];
+//
+//        _leftPinCenterX += translation.x;
+//        _rightPinCenterX += translation.x;
+//
+//        if (_rightPinCenterX > self.width - _appearanceConfig.pinWidth || _leftPinCenterX < _appearanceConfig.pinWidth / 2){
+//            _leftPinCenterX -= translation.x;
+//            _rightPinCenterX -= translation.x;
+//        }
+//
+//        [gesture setTranslation:CGPointZero inView:self];
+//
+//        [self setNeedsLayout];
+//
+//        if ([self.delegate respondsToSelector:@selector(onRangeLeftAndRightChanged:)])
+//            [self.delegate onRangeLeftAndRightChanged:self];
+//
+//    }
+//}
 
 - (CGFloat)pinWidth
 {
@@ -317,5 +380,10 @@
 - (CGFloat)rightScale {
     CGFloat imagesLength = [self imageWidth] * self.imageViewList.count;
     return MAX(0, (_rightPinCenterX - _appearanceConfig.pinWidth / 2 - _appearanceConfig.pinWidth) / imagesLength);
+}
+
+- (CGFloat)centerScale {
+    CGFloat imagesLength = [self imageWidth] * self.imageViewList.count;
+    return MAX(0, (_centerPinCenterX - _appearanceConfig.pinWidth / 2 - _appearanceConfig.pinWidth) / imagesLength);
 }
 @end

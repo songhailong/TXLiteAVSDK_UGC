@@ -28,6 +28,10 @@
 #import <Foundation/Foundation.h>
 #import <QCloudCore/QCloudCore.h>
 NS_ASSUME_NONNULL_BEGIN
+
+/**
+ Delete Bucket Lifecycle 用来删除 Bucket 的生命周期配置。如果该 Bucket 没有配置生命周期规则会返回 NoSuchLifecycleConfiguration。
+ */
 @interface QCloudDeleteBucketLifeCycleRequest : QCloudBizHTTPRequest
 /**
 存储桶名

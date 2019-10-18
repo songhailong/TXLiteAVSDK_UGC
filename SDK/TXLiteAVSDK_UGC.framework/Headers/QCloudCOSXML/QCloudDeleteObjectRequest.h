@@ -28,6 +28,9 @@
 #import <Foundation/Foundation.h>
 #import <QCloudCore/QCloudCore.h>
 NS_ASSUME_NONNULL_BEGIN
+/**
+对象名
+*/
 @interface QCloudDeleteObjectRequest : QCloudBizHTTPRequest
 /**
 对象名
@@ -37,6 +40,10 @@ NS_ASSUME_NONNULL_BEGIN
 存储桶名
 */
 @property (strong, nonatomic) NSString *bucket;
+/**
+如果需要删除指定版本的Object,请在该参数中指定versionID（在开启了多版本的情况才有）
+*/
+@property (strong, nonatomic) NSString *versionID;
 
 
 @end

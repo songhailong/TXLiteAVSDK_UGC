@@ -32,17 +32,16 @@
 NS_ASSUME_NONNULL_BEGIN
 @interface QCloudLifecycleRuleFilter : NSObject
 /**
- 指定规则所适用的前缀。匹配前缀的对象受该规则影响。
- */
+指定规则所适用的前缀。匹配前缀的对象受该规则影响。
+*/
 @property (strong, nonatomic) NSString *prefix;
 /**
- 标签，Tag 可以有零个或者多个
- */
+标签，Tag 可以有零个或者多个
+*/
 @property (strong, nonatomic) NSString *tag;
 /**
- 用于组合 Prefix 与 Tag
- */
+用于组合 Prefix 与 Tag
+*/
 @property (strong, nonatomic) QCloudLifecycleRuleFilterAnd *ruleFilterAnd;
 @end
 NS_ASSUME_NONNULL_END
-

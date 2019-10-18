@@ -34,7 +34,7 @@ NS_ASSUME_NONNULL_BEGIN
 /**
 指定规则所适用的前缀。匹配前缀的对象受该规则影响。
 */
-@property (strong, nonatomic) NSString *filterAndPrefix;
+@property (strong, nonatomic) NSString *prefix;
 /**
 标签，Tag 可以有零个或者多个
 */

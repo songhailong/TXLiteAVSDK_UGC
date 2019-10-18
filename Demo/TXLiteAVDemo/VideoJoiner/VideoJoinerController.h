@@ -10,5 +10,6 @@
 
 @interface VideoJoinerController : UIViewController
 @property NSArray *videoList;
+@property NSArray *videoAssertList;
 @property NSMutableArray *reorderVideoList;
 @end

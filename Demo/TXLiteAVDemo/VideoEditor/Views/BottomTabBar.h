@@ -15,9 +15,12 @@
 @protocol BottomTabBarDelegate <NSObject>
 
 - (void)onCutBtnClicked;
+- (void)onTimeBtnClicked;
 - (void)onFilterBtnClicked;
 - (void)onMusicBtnClicked;
+- (void)onEffectBtnClicked;
 - (void)onTextBtnClicked;
+- (void)onPasterBtnClicked;
 
 @end
 

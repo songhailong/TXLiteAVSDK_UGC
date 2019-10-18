@@ -28,6 +28,16 @@
 #import <Foundation/Foundation.h>
 #import <QCloudCore/QCloudCore.h>
 NS_ASSUME_NONNULL_BEGIN
+
+/**
+ @brief Head Object 接口请求可以获取对应 Object 的 meta 信息数据，Head 的权限与 Get 的权限一致
+ 
+ Head Object 请求是不返回消息体的。
+ 
+ 这里的 ifModifiedSince 统一采用 GMT(RFC822) 时间格式，例如：Tue, 22 Oct 2017 01:35:21 GMT。
+ 
+ 如果 head 的文件不存在，则会返回 404 NOT FOUND。
+ */
 @interface QCloudHeadObjectRequest : QCloudBizHTTPRequest
 /**
 对象的key

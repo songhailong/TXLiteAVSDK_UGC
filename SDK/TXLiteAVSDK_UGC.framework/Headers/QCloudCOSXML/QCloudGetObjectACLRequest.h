@@ -29,6 +29,10 @@
 #import <QCloudCore/QCloudCore.h>
 #import "QCloudACLPolicy.h"
 NS_ASSUME_NONNULL_BEGIN
+
+/**
+ Get Object ACL 接口用来获取某个 Bucket 下的某个 Object 的访问权限。只有 Bucket 的持有者才有权限操作
+ */
 @interface QCloudGetObjectACLRequest : QCloudBizHTTPRequest
 /**
  存储桶名
@@ -40,6 +44,11 @@ NS_ASSUME_NONNULL_BEGIN
 @property (strong, nonatomic) NSString *object;
 
 
+/**
+ 请求完成后的会通过该block回调，返回结果，若error为空，即为成功。
+
+ @param QCloudRequestFinishBlock 回调bock
+ */
 - (void) setFinishBlock:(void (^)(QCloudACLPolicy* result, NSError * error))QCloudRequestFinishBlock;
 @end
 NS_ASSUME_NONNULL_END

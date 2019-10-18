@@ -180,8 +180,10 @@ typedef NS_ENUM(NSInteger, TX_Enum_Type_RTMPChannel) {
 #define EVT_PLAYABLE_DURATION        @"PLAYABLE_DURATION"   
 #define EVT_REPORT_TOKEN             @"EVT_REPORT_TOKEN"
 #define EVT_GET_MSG                  @"EVT_GET_MSG"
-#define EVT_PLAY_COVER_URL           @"EVT_PLAY_COVER_URL"
-#define EVT_PLAY_URL                 @"EVT_PLAY_URL"
+#define EVT_PLAY_COVER_URL           @"EVT_PLAY_COVER_URL"   //视频封面
+#define EVT_PLAY_URL                 @"EVT_PLAY_URL"         //视频播放地址
+#define EVT_PLAY_NAME                @"EVT_PLAY_NAME"        //视频名称
+#define EVT_PLAY_DESCRIPTION         @"EVT_PLAY_DESCRIPTION" //视频简介
 
 #define STREAM_ID                    @"STREAM_ID"
 

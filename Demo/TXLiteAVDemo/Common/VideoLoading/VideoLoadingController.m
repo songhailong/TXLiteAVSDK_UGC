@@ -13,10 +13,10 @@
 
 @interface VideoLoadingController ()
 @property IBOutlet UIImageView *loadingImageView;
-@property AVAssetExportSession *exportSession;
-@property NSTimer *timer;
+@property (weak, nonatomic) IBOutlet UILabel *loadingLabel;
 @property NSMutableArray *localPaths;
 @property NSArray     *videosAssets;
+@property NSMutableArray     *videosToEditAssets;
 @property NSUInteger  exportIndex;
 @property AVMutableComposition *mutableComposition;
 @property AVMutableVideoComposition *mutableVideoComposition;
@@ -32,10 +32,12 @@
     // Do any additional setup after loading the view from its nib.
     self.title = @"选择视频";
     self.view.backgroundColor = UIColor.blackColor;
+    
 }
 
 - (void)viewWillAppear:(BOOL)animated
 {
+    [super viewWillAppear:animated];
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(onAudioSessionEvent:)
                                                  name:AVAudioSessionInterruptionNotification
@@ -44,7 +46,15 @@
 
 - (void)viewWillDisappear:(BOOL)animated
 {
+    [super viewWillDisappear:animated];
     [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
+- (IBAction)cancelLoad:(id)sender {
+    _loadingIsInterrupt = YES;
+    [self dismissViewControllerAnimated:YES completion:^{
+        
+    }];
 }
 
 - (void) onAudioSessionEvent: (NSNotification *) notification
@@ -68,25 +78,23 @@
     _videosAssets = videosAssets;
     _exportIndex = 0;
     _localPaths = [NSMutableArray new];
-    self.timer = [NSTimer scheduledTimerWithTimeInterval:1 target:self selector:@selector(updateProgress) userInfo:nil repeats:YES];
-    
+    _videosToEditAssets = [NSMutableArray array];
     [self exportAssetInternal];
 }
 
 - (void)exportAssetInternal
 {
     if (_exportIndex == _videosAssets.count) {
-        //
-        [self.timer invalidate], self.timer = nil;
-        
         if (!self.composeMode) {
             VideoEditViewController *vc = [VideoEditViewController new];
-            vc.videoPath = _localPaths[0];
+            //vc.videoPath = _localPaths[0];
+            vc.videoAsset = _videosToEditAssets[0];
             if(!_loadingIsInterrupt) [self.navigationController pushViewController:vc animated:YES];
             return;
         } else {
             VideoJoinerController *vc = [VideoJoinerController new];
-            vc.videoList = _localPaths;
+//            vc.videoList = _localPaths;
+            vc.videoAssertList = _videosToEditAssets;
             if(!_loadingIsInterrupt) [self.navigationController pushViewController:vc animated:YES];
             return;
         }
@@ -95,54 +103,28 @@
     self.mutableComposition = nil;
     self.mutableVideoComposition = nil;
     
-    __weak typeof(self) weakSelf = self;
-    __block AVAssetExportSession *weakExportSession = _exportSession;
+    __weak __typeof(self) weakSelf = self;
+//    __block AVAssetExportSession *weakExportSession = _exportSession;
     PHAsset *expAsset = _videosAssets[_exportIndex];
-    [[PHImageManager defaultManager] requestAVAssetForVideo:expAsset options:nil resultHandler:^(AVAsset * _Nullable avAsset, AVAudioMix * _Nullable audioMix, NSDictionary * _Nullable info) {
-        LBVideoOrientation or = avAsset.videoOrientation;
-        if (or == LBVideoOrientationUp || or == LBVideoOrientationDown) {
-            CGFloat angle = 0;
-            if (or == LBVideoOrientationUp)   angle = 90.0;
-            if (or == LBVideoOrientationDown) angle = -90.0;
-            [self performWithAsset:avAsset rotate:angle];
-            weakExportSession = [[AVAssetExportSession alloc] initWithAsset:self.mutableComposition presetName:AVAssetExportPresetHighestQuality];
-            weakExportSession.videoComposition = self.mutableVideoComposition;
-        } else {
-            weakExportSession = [[AVAssetExportSession alloc] initWithAsset:avAsset presetName:AVAssetExportPresetHighestQuality];
-        }
- 
-        
-        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,NSUserDomainMask, YES);
-        NSString *documentsDirectory = [paths objectAtIndex:0];
-        NSString* videoPath = [documentsDirectory stringByAppendingPathComponent:[expAsset orignalFilename]];
-        NSFileManager *manager = [NSFileManager defaultManager];
-
-        NSError *error;
-        if ([manager fileExistsAtPath:videoPath]) {
-            BOOL success = [manager removeItemAtPath:videoPath error:&error];
-            if (success) {
-                NSLog(@"Already exist. Removed!");
+    PHVideoRequestOptions *options = [PHVideoRequestOptions new];
+    // 最高质量的视频
+    options.deliveryMode = PHVideoRequestOptionsDeliveryModeHighQualityFormat;
+    // 可从iCloud中获取图片
+    options.networkAccessAllowed = YES;
+    // 如果是iCloud的视频，可以获取到下载进度
+    options.progressHandler = ^(double progress, NSError * _Nullable error, BOOL * _Nonnull stop, NSDictionary * _Nullable info) {
+        [weakSelf loadingCloudVideoProgress:progress];
+        *stop = _loadingIsInterrupt;
+    };
+    [[PHImageManager defaultManager] requestAVAssetForVideo:expAsset options:options resultHandler:^(AVAsset * _Nullable avAsset, AVAudioMix * _Nullable audioMix, NSDictionary * _Nullable info) {
+        //SDK内部通过avAsset 读取视频数据，会极大的降低视频loading时间
+        dispatch_async(dispatch_get_main_queue(), ^(void) {
+            if (avAsset) {
+                [_videosToEditAssets addObject:avAsset];
+                _exportIndex++;
+                [self exportAssetInternal];
             }
-        }
-        [self.localPaths addObject:videoPath];
-        
-        NSURL *outputURL = [NSURL fileURLWithPath:videoPath];
-        weakExportSession.outputURL = outputURL;
-        weakExportSession.outputFileType = AVFileTypeMPEG4;
-        [weakExportSession exportAsynchronouslyWithCompletionHandler:^{
-                if(weakExportSession.status == AVAssetExportSessionStatusCompleted){
-                    dispatch_async(dispatch_get_main_queue(), ^(void) {
-                        _exportIndex++;
-                        [weakSelf exportAssetInternal];
-                    });
-                }else{
-                    dispatch_async(dispatch_get_main_queue(), ^(void) {
-                        [weakSelf exportAssetError];
-                    });
-                }
-        }];
-        
-        _exportSession = weakExportSession;
+        });
     }];
 }
 
@@ -156,22 +138,15 @@
     [self presentViewController:alert animated:YES completion:nil];
 }
 
-- (void)updateProgress
+- (void)loadingCloudVideoProgress:(float)progress
 {
     dispatch_async(dispatch_get_main_queue(), ^{
-        CGFloat progress = _exportSession.progress;
-        if (_exportSession.status == AVAssetExportSessionStatusFailed ||
-            _exportSession.status == AVAssetExportSessionStatusCompleted) {
-            progress = 1;
-        }
-        CGFloat allp = (progress + _exportIndex)/_videosAssets.count;
-        self.loadingImageView.image = [UIImage imageNamed:[NSString stringWithFormat:@"video_record_share_loading_%d", (int)(allp * 8)]];
+        _loadingLabel.text =  [NSString stringWithFormat:@"视频 %@ 正在从icloud下载，请稍等...",@(_exportIndex + 1)];
+        self.loadingImageView.image = [UIImage imageNamed:[NSString stringWithFormat:@"video_record_share_loading_%d", (int)(progress * 8)]];
     });
 }
 
 #define degreesToRadians( degrees ) ( ( degrees ) / 180.0 * M_PI )
-
-
 
 - (void)performWithAsset:(AVAsset*)asset rotate:(CGFloat)angle
 {

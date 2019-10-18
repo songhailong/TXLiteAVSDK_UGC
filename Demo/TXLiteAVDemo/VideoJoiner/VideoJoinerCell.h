@@ -7,9 +7,11 @@
 //
 
 #import <UIKit/UIKit.h>
+#import <AVFoundation/AVFoundation.h>
 
 @interface VideoJoinerCellModel : NSObject
 @property NSString *videoPath;
+@property AVAsset  *videoAsset;
 @property UIImage *cover;
 @property int duration;
 @property int width;

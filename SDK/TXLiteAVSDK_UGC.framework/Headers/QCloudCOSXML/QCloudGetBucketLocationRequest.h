@@ -29,13 +29,21 @@
 #import <QCloudCore/QCloudCore.h>
 #import "QCloudBucketLocationConstraint.h"
 NS_ASSUME_NONNULL_BEGIN
+
+/**
+ Get Bucket Location 接口用于获取 Bucket 所在的地域信息，该 GET 操作使用 location 子资源返回 Bucket 所在的区域，只有 Bucket 持有者才有该 API 接口的操作权限。
+ */
 @interface QCloudGetBucketLocationRequest : QCloudBizHTTPRequest
 /**p
 存储桶名
 */
 @property (strong, nonatomic) NSString *bucket;
 
-
+/**
+ 请求完成后的会通过该block回调，返回结果，若error为空，即为成功。
+ 
+ @param QCloudRequestFinishBlock 回调bock
+ */
 - (void) setFinishBlock:(void (^)(QCloudBucketLocationConstraint* result, NSError * error))QCloudRequestFinishBlock;
 @end
 NS_ASSUME_NONNULL_END

@@ -28,6 +28,10 @@
 #import <Foundation/Foundation.h>
 #import <QCloudCore/QCloudCore.h>
 NS_ASSUME_NONNULL_BEGIN
+
+/**
+ Put Bucket ACL 接口用来写入 Bucket 的 ACL 表
+ */
 @interface QCloudPutBucketACLRequest : QCloudBizHTTPRequest
 /**
 定义 Object 的 ACL 属性。有效值：private，public-read-write，public-read；默认值：private

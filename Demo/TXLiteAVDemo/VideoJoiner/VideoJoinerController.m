@@ -9,7 +9,7 @@
 #import "VideoJoinerController.h"
 #import "VideoJoinerCell.h"
 #import "VideoEditPrevController.h"
-#import <TXRTMPSDK/TXVideoEditer.h>
+#import "TXVideoEditer.h"
 #import "ColorMacro.h"
 
 static NSString *indetifer = @"VideoJoinerCell";
@@ -29,11 +29,10 @@ static NSString *indetifer = @"VideoJoinerCell";
     [_tableView setEditing:YES animated:YES];
     
     _reorderVideoList = [NSMutableArray new];
-    for (NSString *videoPath in self.videoList) {
+    for (AVAsset *asset in self.videoAssertList) {
         VideoJoinerCellModel *model = [VideoJoinerCellModel new];
-        model.videoPath = videoPath;
-        
-        TXVideoInfo *info = [TXVideoInfoReader getVideoInfo:videoPath];
+        model.videoAsset = asset;
+        TXVideoInfo *info = [TXVideoInfoReader getVideoInfoWithAsset:asset];
         model.cover = info.coverImage;
         model.duration = info.duration;
         model.width = info.width;
@@ -112,7 +111,7 @@ static NSString *indetifer = @"VideoJoinerCell";
     VideoEditPrevController *vc = [VideoEditPrevController new];
     NSMutableArray *list = [NSMutableArray new];
     for (VideoJoinerCellModel *model in self.reorderVideoList) {
-        [list addObject:model.videoPath];
+        [list addObject:model.videoAsset];
     }
     vc.composeArray = list;
     [self.navigationController pushViewController:vc animated:YES];

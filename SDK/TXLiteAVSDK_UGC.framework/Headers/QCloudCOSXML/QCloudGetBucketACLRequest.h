@@ -29,13 +29,21 @@
 #import <QCloudCore/QCloudCore.h>
 #import "QCloudACLPolicy.h"
 NS_ASSUME_NONNULL_BEGIN
+
+/**
+ Get Bucket ACL 接口用来获取 Bucket 的 ACL(access control list)， 即用户空间（Bucket）的访问权限控制列表。 此 API 接口只有 Bucket 的持有者有权限操作。
+ */
 @interface QCloudGetBucketACLRequest : QCloudBizHTTPRequest
 /**
 存储桶名
 */
 @property (strong, nonatomic) NSString *bucket;
 
-
+/**
+ 请求完成后的会通过该block回调，返回结果，若error为空，即为成功。
+ 
+ @param QCloudRequestFinishBlock 回调bock
+ */
 - (void) setFinishBlock:(void (^)(QCloudACLPolicy* result, NSError * error))QCloudRequestFinishBlock;
 @end
 NS_ASSUME_NONNULL_END

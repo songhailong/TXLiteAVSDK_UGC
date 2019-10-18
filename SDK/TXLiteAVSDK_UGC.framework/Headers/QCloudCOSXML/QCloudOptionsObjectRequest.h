@@ -28,6 +28,11 @@
 #import <Foundation/Foundation.h>
 #import <QCloudCore/QCloudCore.h>
 NS_ASSUME_NONNULL_BEGIN
+
+/**
+ Options Object 接口实现 Object 跨域访问配置的预请求。即在发送跨域请求之前会发送一个 OPTIONS 请求并带上特定的来源域，HTTP 方法和 HEADER 信息等给 COS，以决定是否可以发送真正的跨域请求。当 CORS 配置不存在时，请求返回 403 Forbidden。
+ 可以通过 Put Bucket CORS 接口来开启 Bucket 的 CORS 支持。
+ */
 @interface QCloudOptionsObjectRequest : QCloudBizHTTPRequest
 /**
 对象的key

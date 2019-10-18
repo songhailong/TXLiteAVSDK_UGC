@@ -29,6 +29,11 @@
 #import <QCloudCore/QCloudCore.h>
 #import "QCloudListMultipartUploadsResult.h"
 NS_ASSUME_NONNULL_BEGIN
+
+/**
+ List Multipart Uploads 用来查询正在进行中的分块上传。单次请求操作最多列出 1000 个正在进行中的分块上传。
+ 
+ */
 @interface QCloudListBucketMultipartUploadsRequest : QCloudBizHTTPRequest
 /**
 存储桶名
@@ -60,7 +65,11 @@ NS_ASSUME_NONNULL_BEGIN
 */
 @property (strong, nonatomic) NSString *uploadIDMarker;
 
-
+/**
+ 请求完成后的会通过该block回调，返回结果，若error为空，即为成功。
+ 
+ @param QCloudRequestFinishBlock 回调bock
+ */
 - (void) setFinishBlock:(void (^)(QCloudListMultipartUploadsResult* result, NSError * error))QCloudRequestFinishBlock;
 @end
 NS_ASSUME_NONNULL_END

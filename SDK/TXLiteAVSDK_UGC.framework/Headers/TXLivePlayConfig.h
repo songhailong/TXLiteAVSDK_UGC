@@ -51,4 +51,6 @@
 @property NSString *cacheFolderPath;        /// 视频缓存目录，点播MP4、HLS有效
 @property int maxCacheItems;                /// 最多缓存文件个数
 
+@property NSDictionary *headers;            /// 自定义HTTP Headers
+
 @end

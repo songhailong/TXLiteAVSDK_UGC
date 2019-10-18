@@ -7,21 +7,21 @@
 //
 
 #import "VideoTextViewController.h"
-#import <TXVideoEditer.h>
+#import "TXVideoEditer.h"
 #import "VideoPreview.h"
 #import "UIView+Additions.h"
 #import "ColorMacro.h"
 #import "RangeContent.h"
 #import "TextCollectionCell.h"
 #import "VideoTextFiled.h"
-
+#import "PasterSelectView.h"
 
 
 @implementation VideoTextInfo
 @end
 
 
-@interface VideoTextViewController () <VideoPreviewDelegate, UICollectionViewDelegate, UICollectionViewDataSource, RangeContentDelegate, VideoTextFieldDelegate>
+@interface VideoTextViewController () <VideoPreviewDelegate, UICollectionViewDelegate, UICollectionViewDataSource, RangeContentDelegate, VideoTextFieldDelegate , PasterSelectViewDelegate>
 {
     VideoPreview  *_videoPreview;       //视频预览view
     TXVideoEditer* _ugcEditer;          //sdk的editer
@@ -40,12 +40,19 @@
     CGFloat        _videoStartTime;     //裁剪的视频开始时间
     CGFloat        _videoEndTime;       //裁剪的视频结束时间
     
+    CGFloat        _previewAtTime;      //预览时间点
+    
     CGFloat        _videoDuration;      //裁剪的视频总时间
     UILabel*       _timeLabel;
     
     BOOL            _isVideoPlaying;
     
     NSMutableArray<VideoTextInfo*>* _videoTextInfos;    //字幕列表信息
+    
+    UITapGestureRecognizer* _singleTap;
+    
+    PasterSelectView *  _selectView;
+    NSArray *      _qipaoList;
 }
 
 @end
@@ -92,6 +99,7 @@
 
 - (void)dealloc
 {
+    [_videoPreview removeGestureRecognizer:_singleTap];
     NSLog(@"VideoTextViewController dealloc");
 }
 
@@ -114,7 +122,7 @@
     _videoPreview.delegate = self;
     _videoPreview.backgroundColor = UIColor.darkTextColor;
     
-    [_ugcEditer previewAtTime:0.f];
+    [_ugcEditer previewAtTime:_videoStartTime];
     [_ugcEditer pausePlay];
     _isVideoPlaying = NO;
    
@@ -134,7 +142,7 @@
     _timeLabel.textColor = UIColorFromRGB(0x777777);
     _timeLabel.font = [UIFont systemFontOfSize:14];
     [_timeLabel sizeToFit];
-    _timeLabel.center = CGPointMake(self.view.width - 30 * kScaleX - _timeLabel.width / 2, _playBtn.center.y);
+    _timeLabel.center = CGPointMake(self.view.width - 15 * kScaleX - _timeLabel.width / 2, _playBtn.center.y);
     [self.view addSubview:_timeLabel];
     
     UIView* toImageView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.view.width, 2)];
@@ -217,7 +225,44 @@
     _videoTextCollection.allowsMultipleSelection = NO;
     [_videoTextCollection registerClass:[TextCollectionCell class] forCellWithReuseIdentifier:@"TextCollectionCell"];
     [bottomView addSubview:_videoTextCollection];
+    
+    [self createSelectView];
+    
+    //点击选中文字
+    _singleTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(onTap:)];
+    [_videoPreview addGestureRecognizer:_singleTap];
 }
+
+- (void)createSelectView
+{
+    NSString *bundlePath = [[NSBundle mainBundle] pathForResource:@"bubbleText" ofType:@"bundle"];
+    int height = 80 * kScaleY;
+    _selectView = [[PasterSelectView alloc] initWithFrame:CGRectMake(0, self.view.bottom - height - 60, self.view.width, height) pasterType:PasterType_Qipao boundPath:bundlePath];
+    _selectView.delegate = self;
+    _selectView.hidden = YES;
+    [self.view addSubview:_selectView];
+}
+
+#pragma mark PasterSelectViewDelegate
+- (void)onPasterQipaoSelect:(PasterQipaoInfo *)info
+{
+    if (_videoTextInfos.count > 0) {
+        int width = 170;
+        int height = info.height / info.width * width;
+        
+        VideoTextInfo* textInfo =  [self getSelectedVideoTextInfo];;
+        VideoTextFiled *textField = textInfo.textField;
+        [textField setTextBubbleImage:info.image textNormalizationFrame:CGRectMake(info.textLeft / info.width, info.textTop / info.height, (info.width - info.textLeft - info.textRight) / info.width, (info.height - info.textTop - info.textBottom) / info.height)];
+        textField.frame = CGRectMake((_videoPreview.width - width) / 2, (_videoPreview.height - height) / 2, width, height);
+    }
+    _selectView.hidden = YES;
+}
+
+- (void)onBubbleTap
+{
+    _selectView.hidden = NO;
+}
+
 
 - (void)setProgressHidden:(BOOL)isHidden
 {
@@ -232,7 +277,8 @@
         _rightTimeLabel.hidden = NO;
         [_ugcEditer pausePlay];
         _isVideoPlaying = NO;
-        [_ugcEditer previewAtTime:_videoRangeSlider.leftScale * (_videoDuration) + _videoStartTime];
+        //[_ugcEditer previewAtTime:_videoRangeSlider.leftScale * (_videoDuration) + _videoStartTime];
+        [_ugcEditer previewAtTime:_previewAtTime];
     } else {
         //显示进度条时隐藏时间区域选择条
         _progressView.hidden = NO;
@@ -252,11 +298,13 @@
 //当前选中的字幕信息
 - (VideoTextInfo*)getSelectedVideoTextInfo
 {
-    NSIndexPath* selectedIndexPath = [_videoTextCollection indexPathsForSelectedItems][0];
-    if (selectedIndexPath.row < _videoTextInfos.count) {
-        return _videoTextInfos[selectedIndexPath.row];
+    NSArray<NSIndexPath *> *indexPathsForSelectedItems =  [_videoTextCollection indexPathsForSelectedItems];
+    if (indexPathsForSelectedItems.count > 0) {
+        NSIndexPath* selectedIndexPath = [_videoTextCollection indexPathsForSelectedItems][0];
+        if (selectedIndexPath.row < _videoTextInfos.count) {
+            return _videoTextInfos[selectedIndexPath.row];
+        }
     }
-    
     return nil;
 }
 
@@ -275,9 +323,6 @@
     if (!textInfo)
         return;
     
-    [self setVideoSubtitles:videoTexts];
-    [self setProgressHidden:YES];
-    
     //设置展示当前选中字幕的时间信息
     textInfo.textField.hidden = NO;
     [_videoPreview addSubview:textInfo.textField];
@@ -294,18 +339,18 @@
     _rightTimeLabel.frame = CGRectMake(_videoRangeSlider.x + _videoRangeSlider.rightPinCenterX - _videoRangeSlider.pinWidth / 2, _videoRangeSlider.top - 12, 30, 10);
     _rightTimeLabel.text = [NSString stringWithFormat:@"%.02f", _videoRangeSlider.rightScale *_videoDuration];
     
+    _previewAtTime = textInfo.startTime;
+    
+    [self setVideoSubtitles:videoTexts];
+    [self setProgressHidden:YES];
+
 }
 
 //设置字幕
 - (void)setVideoSubtitles:(NSArray<VideoTextInfo*>*)videoTextInfos
 {
     NSMutableArray* subtitles = [NSMutableArray new];
-    
-    //UIImageView* imageView = [UIImageView new];
-    //imageView.contentMode = UIViewContentModeCenter;
-    //[_videoPreview addSubview:imageView];
-    //imageView.backgroundColor = UIColor.redColor;
-    
+
     NSMutableArray<VideoTextInfo*>* emptyVideoTexts;
     
     for (VideoTextInfo* textInfo in videoTextInfos) {
@@ -319,9 +364,6 @@
         subtitle.frame = [textInfo.textField textFrameOnView:_videoPreview];
         subtitle.startTime = textInfo.startTime;
         subtitle.endTime = textInfo.endTime;
-        //imageView.frame = CGRectMake(subtitle.frame.origin.x, subtitle.frame.origin.y, subtitle.frame.size.width, subtitle.frame.size.height);
-        //imageView.image = subtitle.titleImage;
-        
         [subtitles addObject:subtitle];
     }
     
@@ -359,6 +401,9 @@
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath
 {
     VideoTextInfo* textInfo = [self getSelectedVideoTextInfo];
+    //if (_previewAtTime < textInfo.startTime || _previewAtTime > textInfo.endTime) {
+        _previewAtTime = textInfo.startTime;
+    //}
     [self showVideoTextInfo:textInfo];
 }
 
@@ -388,25 +433,27 @@
         [_ugcEditer pausePlay];
         [_playBtn setImage:[UIImage imageNamed:@"videotext_play"] forState:UIControlStateNormal];
         _isVideoPlaying = NO;
+        
+        _previewAtTime = _progressView.value;
     }
+    _selectView.hidden = YES;
 }
 
 //新添加文字
 - (void)onNewTextBtnClicked:(UIButton*)sender
 {
+    _selectView.hidden = NO;
+    
     [self setProgressHidden:YES];
     
     VideoTextFiled* videoTextField = [[VideoTextFiled alloc] initWithFrame:CGRectMake((_videoPreview.width - 170) / 2, (_videoPreview.height - 50) / 2, 170, 50)];
     videoTextField.delegate = self;
     [_videoPreview addSubview:videoTextField];
 
-    
-    CGFloat segDuration = (_videoDuration - 0.1) / 10;
-    int segIndex = _videoTextInfos.count % 10;
     VideoTextInfo* info = [VideoTextInfo new];
     info.textField = videoTextField;
-    info.startTime = _videoStartTime + segDuration * segIndex;
-    info.endTime = info.startTime + segDuration;
+    info.startTime = [self getStartTime];
+    info.endTime = [self getEndTime:info.startTime];
     [_videoTextInfos addObject:info];
     
     [_videoTextCollection reloadData];
@@ -415,7 +462,38 @@
         [_videoTextCollection selectItemAtIndexPath:indexPath animated:YES scrollPosition:UICollectionViewScrollPositionCenteredHorizontally];
     }];
     
+    _previewAtTime = info.startTime;
+    
     [self showVideoTextInfo:info];
+}
+
+- (float)getStartTime
+{
+    CGFloat time = 0;
+    if (_videoTextInfos.count > 0) {
+        VideoTextInfo * info = [_videoTextInfos lastObject];
+        time += info.endTime;
+    }
+    
+    if (time == 0) {
+        time += (_videoStartTime);
+    }else{
+        time += (_videoStartTime + 0.5);
+    }
+  
+    if (time >= _videoEndTime) {
+        time = 0;
+    }
+    return time;
+}
+
+- (float)getEndTime:(float)startTime
+{
+    CGFloat time = startTime + (_videoEndTime - _videoStartTime) / 10;
+    if (time >= _videoEndTime) {
+        time = _videoEndTime;
+    }
+    return time;
 }
 
 //播放条拖动，
@@ -424,15 +502,18 @@
     _progressedLabel.x = _progressView.x + (progressSlider.value - _videoStartTime) / _videoDuration * (_progressView.width - _progressView.currentThumbImage.size.width);
     _progressedLabel.text = [NSString stringWithFormat:@"%.02f", progressSlider.value - _videoStartTime];
     [_ugcEditer previewAtTime:progressSlider.value];
+    
+    _previewAtTime = progressSlider.value;
 
 }
 
 - (void)onProgressSlideEnd:(UISlider*)progressSlider
 {
 //    [_ugcEditer pausePlay];
-    [_ugcEditer startPlayFromTime:progressSlider.value toTime:_videoEndTime];
-    _isVideoPlaying = YES;
-    [_playBtn setImage:[UIImage imageNamed:@"videotext_stop"] forState:UIControlStateNormal];
+    if (_isVideoPlaying)
+        [_ugcEditer startPlayFromTime:progressSlider.value toTime:_videoEndTime];
+    //_isVideoPlaying = YES;
+    //[_playBtn setImage:[UIImage imageNamed:@"videotext_stop"] forState:UIControlStateNormal];
 }
 
 //返回
@@ -452,6 +533,29 @@
     [self dismissViewControllerAnimated:YES completion:nil];
 }
 
+//点击选中文字
+- (void)onTap:(UITapGestureRecognizer*)recognizer
+{
+    CGPoint tapPoint = [recognizer locationInView:recognizer.view];
+    
+    BOOL hasText = NO;
+    for (NSInteger i = 0; i < _videoTextInfos.count; i++) {
+        CGRect textFrame = [_videoTextInfos[i].textField textFrameOnView:recognizer.view];
+        if (CGRectContainsPoint(textFrame, tapPoint)) {
+            VideoTextInfo *info = _videoTextInfos[i];
+            if (_previewAtTime >= info.startTime && _previewAtTime <= info.endTime){
+                NSIndexPath* indexPath = [NSIndexPath indexPathForRow:i inSection:0];
+                [_videoTextCollection selectItemAtIndexPath:indexPath animated:YES scrollPosition:UICollectionViewScrollPositionCenteredHorizontally];
+                [self showVideoTextInfo:info];
+                hasText = YES;
+                break;
+            }
+        }
+    }
+    if (!hasText) {
+        _selectView.hidden = YES;
+    }
+}
 
 #pragma mark - VideoTextFieldDelegate
 //文字输入完成
@@ -468,11 +572,12 @@
     VideoTextInfo* info = [self getSelectedVideoTextInfo];
     [info.textField resignFirstResponser];
     [_videoTextInfos removeObject:info];
-    
     [_videoTextCollection reloadData];
+    
     //没有了选中字幕,显示播放条
     [self setProgressHidden:NO];
     [self setVideoSubtitles:_videoTextInfos];
+    [_selectView setHidden:YES];
 }
 
 #pragma mark - RangeContentDelegate
@@ -484,17 +589,20 @@
     
     _leftTimeLabel.frame = CGRectMake(_videoRangeSlider.x + _videoRangeSlider.leftPin.x, _videoRangeSlider.top - 12, 30, 10);
     _leftTimeLabel.text = [NSString stringWithFormat:@"%.02f", sender.leftScale * _videoDuration];
+    
+    _previewAtTime = textStartTime;
 }
 
 - (void)onRangeLeftChangeEnded:(RangeContent *)sender
 {
-    
     CGFloat textStartTime =  _videoStartTime + sender.leftScale * (_videoDuration);
     //[_ugcEditer startPlayFromTime:textStartTime toTime:textEndTime];
     [_ugcEditer previewAtTime:textStartTime];
     
     VideoTextInfo* textInfo = [self getSelectedVideoTextInfo];
     textInfo.startTime = textStartTime;
+    
+    _previewAtTime = textStartTime;
 }
 
 - (void)onRangeRightChanged:(RangeContent *)sender
@@ -504,6 +612,8 @@
     
     _rightTimeLabel.frame = CGRectMake(_videoRangeSlider.x + _videoRangeSlider.rightPin.x, _videoRangeSlider.top - 12, 30, 10);
     _rightTimeLabel.text = [NSString stringWithFormat:@"%.02f", sender.rightScale * _videoDuration];
+    
+    _previewAtTime = textEndTime;
 }
 
 - (void)onRangeRightChangeEnded:(RangeContent *)sender
@@ -513,6 +623,8 @@
     
     VideoTextInfo* textInfo = [self getSelectedVideoTextInfo];
     textInfo.endTime = textEndTime;
+    
+    _previewAtTime = textEndTime;
 }
 
 #pragma mark - VideoPreviewDelegate
@@ -522,7 +634,7 @@
     [_playBtn setImage:[UIImage imageNamed:@"videotext_stop"] forState:UIControlStateNormal];
 
     _isVideoPlaying = YES;
-
+    _selectView.hidden = YES;
 }
 
 - (void)onVideoPause
@@ -538,12 +650,13 @@
     //[_ugcEditer resumePlay];
     [_ugcEditer startPlayFromTime:_progressView.value toTime:_videoEndTime];
     _isVideoPlaying = YES;
-
+    _selectView.hidden = YES;
 }
 
 - (void)onVideoPlayProgress:(CGFloat)time
 {
     _progressView.value = time;
+    _previewAtTime = time;
     _progressedLabel.text = [NSString stringWithFormat:@"%.02f", time - _videoStartTime];
     _progressedLabel.x = _progressView.x + (time - _videoStartTime) / _videoDuration * (_progressView.width - _progressView.currentThumbImage.size.width);
 }

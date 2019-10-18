@@ -29,40 +29,6 @@
 #import <Foundation/Foundation.h>
 #import <QCloudCore/QCloudService.h>
 
-@class QCloudAppendObjectRequest;
-@class QCloudGetObjectACLRequest;
-@class QCloudPutObjectRequest;
-@class QCloudPutObjectACLRequest;
-@class QCloudDeleteObjectRequest;
-@class QCloudDeleteMultipleObjectRequest;
-@class QCloudHeadObjectRequest;
-@class QCloudOptionsObjectRequest;
-@class QCloudInitiateMultipartUploadRequest;
-@class QCloudUploadPartRequest;
-@class QCloudListMultipartRequest;
-@class QCloudCompleteMultipartUploadRequest;
-@class QCloudAbortMultipfartUploadRequest;
-@class QCloudGetObjectRequest;
-@class QCloudGetBucketRequest;
-@class QCloudGetBucketACLRequest;
-@class QCloudGetBucketCORSRequest;
-@class QCloudGetBucketLocationRequest;
-@class QCloudGetBucketLifecycleRequest;
-@class QCloudGetBucketTaggingRequest;
-@class QCloudPutBucketRequest;
-@class QCloudPutBucketACLRequest;
-@class QCloudPutBucketCORSRequest;
-@class QCloudPutBucketLifecycleRequest;
-@class QCloudPutBucketTaggingRequest;
-@class QCloudDeleteBucketRequest;
-@class QCloudDeleteBucketCORSRequest;
-@class QCloudDeleteBucketLifeCycleRequest;
-@class QCloudDeleteBucketTaggingRequest;
-@class QCloudHeadBucketRequest;
-@class QCloudListBucketMultipartUploadsRequest;
-@class QCloudPutObjectCopyRequest;
-@class QCloudDeleteBucketRequest;
-
 @interface QCloudCOSXMLService : QCloudService
 
 #pragma hidden super selectors
@@ -74,37 +40,22 @@
 + (QCloudCOSXMLService*) cosxmlServiceForKey:(NSString*)key;
 + (QCloudCOSXMLService*) registerDefaultCOSXMLWithConfiguration:(QCloudServiceConfiguration*)configuration;
 + (QCloudCOSXMLService*) registerCOSXMLWithConfiguration:(QCloudServiceConfiguration*)configuration withKey:(NSString*)key;
++ (void) removeCOSXMLWithKey:(NSString*)key;
 
-- (void) AppendObject:(QCloudAppendObjectRequest*)request;
-- (void) GetObjectACL:(QCloudGetObjectACLRequest*)request;
-- (void) PutObject:(QCloudPutObjectRequest*)request;
-- (void) PutObjectACL:(QCloudPutObjectACLRequest*)request;
-- (void) DeleteObject:(QCloudDeleteObjectRequest*)request;
-- (void) DeleteMultipleObject:(QCloudDeleteMultipleObjectRequest*)request;
-- (void) HeadObject:(QCloudHeadObjectRequest*)request;
-- (void) OptionsObject:(QCloudOptionsObjectRequest*)request;
-- (void) InitiateMultipartUpload:(QCloudInitiateMultipartUploadRequest*)request;
-- (void) UploadPart:(QCloudUploadPartRequest*)request;
-- (void) ListMultipart:(QCloudListMultipartRequest*)request;
-- (void) CompleteMultipartUpload:(QCloudCompleteMultipartUploadRequest*)request;
-- (void) AbortMultipfartUpload:(QCloudAbortMultipfartUploadRequest*)request;
-- (void) GetObject:(QCloudGetObjectRequest*)request;
-- (void) PutBucket:(QCloudPutBucketRequest*)request;
-- (void) GetBucket:(QCloudGetBucketRequest*)request;
-- (void) GetBucketACL:(QCloudGetBucketACLRequest*)request;
-- (void) GetBucketCORS:(QCloudGetBucketCORSRequest*)request;
-- (void) GetBucketLocation:(QCloudGetBucketLocationRequest*)request;
-- (void) GetBucketLifecycle:(QCloudGetBucketLifecycleRequest*)request;
-- (void) GetBucketTagging:(QCloudGetBucketTaggingRequest*)request;
-- (void) PutBucketACL:(QCloudPutBucketACLRequest*)request;
-- (void) PutBucketCORS:(QCloudPutBucketCORSRequest*)request;
-- (void) PutBucketLifecycle:(QCloudPutBucketLifecycleRequest*)request;
-- (void) PutBucketTagging:(QCloudPutBucketTaggingRequest*)request;
-- (void) DeleteBucketCORS:(QCloudDeleteBucketCORSRequest*)request;
-- (void) DeleteBucketLifeCycle:(QCloudDeleteBucketLifeCycleRequest*)request;
-- (void) DeleteBucketTagging:(QCloudDeleteBucketTaggingRequest*)request;
-- (void) DeleteBucket:(QCloudDeleteBucketRequest*)request;
-- (void) HeadBucket:(QCloudHeadBucketRequest*)request;
-- (void) PutObjectCopy:(QCloudPutObjectRequest*)request;
-- (void) ListBucketMultipartUploads:(QCloudListBucketMultipartUploadsRequest*)request;
+/**
+根据Bukcet, Object来生成可以直接访问的URL。如果您的Bucket是私有读的话，那么访问的时候需要带上签名，反之则不需要。
+ 
+ 
+需要注意的是，如果通过该接口来生成带签名的URL的话，因为签名可能是在服务器生成的，该方法是同步方法，可能因为网络请求阻塞，建议不要在主线程里调用。
+
+此外, 传入的Object需要是URLEncode后的结果。
+ 
+ @param bucket 存储桶
+ @param object 存储对象, 请传入URL Encode后的结果
+ @param withAuthorization 是否需要签名，如果是私有读的Bucket，那么该URL需要带上签名才能访问
+ @return object URL
+ */
+- (NSString*)getURLWithBucket:(NSString*)bucket object:(NSString*)object withAuthorization:(BOOL)withAuthorization;
+
+
 @end

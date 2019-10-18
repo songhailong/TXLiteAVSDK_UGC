@@ -9,8 +9,8 @@
 #ifndef VideoRangeConst_h
 #define VideoRangeConst_h
 
-#define MIDDLE_LINE_HEIGHT 107
-#define PIN_WIDTH 18 
+#define MIDDLE_LINE_HEIGHT 97 * kScaleY
+#define PIN_WIDTH 18
 #define THUMB_HEIGHT 60
 #define BORDER_HEIGHT 2
 

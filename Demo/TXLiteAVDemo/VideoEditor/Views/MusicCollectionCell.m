@@ -12,7 +12,6 @@
 
 @implementation MusicInfo
 
-
 @end
 
 @implementation MusicCollectionCell

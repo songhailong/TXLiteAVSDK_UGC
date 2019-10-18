@@ -29,6 +29,10 @@
 #import <QCloudCore/QCloudCore.h>
 #import "QCloudListPartsResult.h"
 NS_ASSUME_NONNULL_BEGIN
+
+/**
+ 该接口用来查询特定分块上传中的已上传的块，即罗列出指定 UploadId 所属的所有已上传成功的分块。
+ */
 @interface QCloudListMultipartRequest : QCloudBizHTTPRequest
 /**
 对象的名称
@@ -55,7 +59,11 @@ NS_ASSUME_NONNULL_BEGIN
 */
 @property (strong, nonatomic) NSString *encodingType;
 
-
+/**
+ 请求完成后的会通过该block回调，返回结果，若error为空，即为成功。
+ 
+ @param QCloudRequestFinishBlock 回调bock
+ */
 - (void) setFinishBlock:(void (^)(QCloudListPartsResult* result, NSError * error))QCloudRequestFinishBlock;
 @end
 NS_ASSUME_NONNULL_END

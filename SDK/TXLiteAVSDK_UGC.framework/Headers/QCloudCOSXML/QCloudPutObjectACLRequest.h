@@ -28,6 +28,14 @@
 #import <Foundation/Foundation.h>
 #import <QCloudCore/QCloudCore.h>
 NS_ASSUME_NONNULL_BEGIN
+
+/**
+ @brief Put Object ACL 接口用来对某个 Bucket 中的某个的 Object 进行 ACL 表的配置。
+ 
+ 注意：
+ Put Object ACL 是一个覆盖操作，传入新的 ACL 将覆盖原有 ACL。
+ 只有 Bucket 持有者才有权操作。
+ */
 @interface QCloudPutObjectACLRequest : QCloudBizHTTPRequest
 /**
 object名

@@ -29,6 +29,12 @@
 #import <QCloudCore/QCloudCore.h>
 @class QCloudCORSConfiguration;
 NS_ASSUME_NONNULL_BEGIN
+
+/**
+ @brief Put Bucket CORS 接口用来请求设置 Bucket 的跨域资源共享权限。
+ 
+ 使用 Put Bucket CORS 接口创建的规则权限是覆盖当前的所有规则而不是新增一条权限规则。
+ */
 @interface QCloudPutBucketCORSRequest : QCloudBizHTTPRequest
 @property (strong, nonatomic) QCloudCORSConfiguration *corsConfiguration;
 /**

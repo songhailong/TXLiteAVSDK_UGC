@@ -19,6 +19,7 @@
 
 @optional
 - (void)onVideoEnterBackground;
+- (void)onVideoWillEnterForeground;
 @end
 
 @interface VideoPreview : UIView<TXVideoPreviewListener>

@@ -323,6 +323,20 @@ typedef void (^IGetUrlAndPushingCompletionHandler)(int errCode, NSString *errMsg
                     [weakSelf asyncRun:^{
                         // 启动推流
                         _pushUrl = pushUrl;
+                        
+                        TXLivePushConfig *config = [[TXLivePushConfig alloc] init];
+                        config.videoEncodeGop = 1;
+                        config.audioSampleRate = AUDIO_SAMPLE_RATE_16000;
+                        config.videoResolution = VIDEO_RESOLUTION_TYPE_360_640;
+                        config.enableAutoBitrate = YES;
+                        config.videoBitrateMin = 400;
+                        config.videoBitrateMax = 800;
+                        config.autoAdjustStrategy = AUTO_ADJUST_REALTIME_VIDEOCHAT_STRATEGY;
+                        config.pauseImg = [UIImage imageNamed:@"pause_publish.jpg"];
+                        config.pauseFps = 15;
+                        config.pauseTime = 0x7fffffff;
+                        [_livePusher setVideoQuality:VIDEO_QUALITY_REALTIME_VIDEOCHAT adjustBitrate:YES adjustResolution:YES];
+                        [_livePusher setConfig:config];
                         [_livePusher startPush:_pushUrl];
                     }];
                     

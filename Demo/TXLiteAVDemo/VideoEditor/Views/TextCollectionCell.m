@@ -52,3 +52,27 @@
 }
 
 @end
+
+
+@implementation PasterCollectionCell
+
+- (id)initWithFrame:(CGRect)frame
+{
+    if (self = [super initWithFrame:frame]) {
+        self.layer.borderWidth = 1;
+        self.layer.borderColor = UIColorFromRGB(0x777777).CGColor;
+        self.backgroundColor = UIColor.clearColor;
+        _imageView = [UIImageView new];
+        [self.contentView addSubview:_imageView];
+    }
+    
+    return self;
+}
+
+- (void)layoutSubviews
+{
+    [super layoutSubviews];
+    
+    _imageView.frame = CGRectMake(5, 6, self.contentView.width - 10, self.contentView.height - 14);
+}
+@end

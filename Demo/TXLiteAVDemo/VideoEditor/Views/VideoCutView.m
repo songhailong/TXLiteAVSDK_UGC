@@ -11,7 +11,7 @@
 #import "VideoRangeSlider.h"
 #import "ColorMacro.h"
 #import "UIView+Additions.h"
-#import <TXRTMPSDK/TXVideoEditer.h>
+#import "TXVideoEditer.h"
 
 @interface VideoCutView ()<VideoRangeSliderDelegate>
 
@@ -19,35 +19,20 @@
 
 @implementation VideoCutView
 {
-    UILabel*        _cutTipLabel;       //标题Label
-    NSMutableArray  *_imageList;        //缩略图列表
     CGFloat         _duration;          //视频时长
-    UILabel         *_timeTipsLabel;    //当前播放时间显示
+    UILabel*        _timeTipsLabel;    //当前播放时间显示
     NSString*       _videoPath;         //视频路径
-    
-    
-    //加速按钮，用拖动条取代了
-    UIButton*      _speedUpBtn;
-    BOOL           _isSpeedUp;
-    
-    //加速拖动条
-    UILabel*      _speedTipLabel;
-    UISlider*     _speedUpSlider;
-    UILabel*      _speedLabel;
-
+    AVAsset*        _videoAssert;
+    UIButton*       _effectDeleteBtn;
+    UILabel *       _cutTipsLabel;
+    BOOL            _isContinue;
 }
 
-- (id)initWithFrame:(CGRect)frame videoPath:(NSString *)videoPath
+- (id)initWithFrame:(CGRect)frame videoPath:(NSString *)videoPath  videoAssert:(AVAsset *)videoAssert
 {
     if (self = [super initWithFrame:frame]) {
         _videoPath = videoPath;
-        _isSpeedUp = NO;
-        
-        _cutTipLabel = [[UILabel alloc] init];
-        _cutTipLabel.text = @"设定想要截取的片段";
-        _cutTipLabel.textAlignment = NSTextAlignmentCenter;
-        _cutTipLabel.textColor = UIColorFromRGB(0x777777);
-        [self addSubview:_cutTipLabel];
+        _videoAssert = videoAssert;
         
         _timeTipsLabel = [[UILabel alloc] init];
         _timeTipsLabel.text = @"0 s";
@@ -56,80 +41,71 @@
         _timeTipsLabel.textColor = UIColorFromRGB(0x777777);
         [self addSubview:_timeTipsLabel];
         
-        _speedUpBtn = [UIButton new];
-        [_speedUpBtn setBackgroundImage:[UIImage imageNamed:@"2xspeed"] forState:UIControlStateNormal];
-        [_speedUpBtn addTarget:self action:@selector(onSpeedUpBtnClicked:) forControlEvents:UIControlEventTouchUpInside];
-        [self addSubview:_speedUpBtn];
-        _speedUpBtn.hidden = YES;
+        _videoRangeSlider = [[VideoRangeSlider alloc] init];
+        [self addSubview:_videoRangeSlider];
         
-        _speedTipLabel = [UILabel new];
-        _speedTipLabel.text = @"设置加速";
-        _speedTipLabel.font = [UIFont systemFontOfSize:14];
-        _speedTipLabel.textColor = UIColorFromRGB(0x777777);
-        [self addSubview:_speedTipLabel];
+        CGFloat width = 42 * 0.7 * kScaleX;
+        CGFloat height = 32 * 0.7 * kScaleY;
+        _effectDeleteBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+        [_effectDeleteBtn setBackgroundImage:[UIImage imageNamed:@"effectDelete"] forState:UIControlStateNormal];
+        _effectDeleteBtn.titleLabel.textColor = [UIColor redColor];
+        _effectDeleteBtn.frame = CGRectMake(self.width - width - 20 * kScaleX, 10 * kScaleY, width, height);
+        [_effectDeleteBtn addTarget:self action:@selector(onEffectDelete) forControlEvents:UIControlEventTouchUpInside];
+        _effectDeleteBtn.hidden = YES;
+        [self addSubview:_effectDeleteBtn];
         
-        _speedUpSlider = [UISlider new];
-        _speedUpSlider.minimumValue = 1.0;
-        _speedUpSlider.maximumValue = 4.0;
-        _speedUpSlider.tintColor = UIColorFromRGB(0x0accac);
-        [_speedUpSlider setThumbImage:[UIImage imageNamed:@"slider"] forState:UIControlStateNormal];
-        [_speedUpSlider addTarget:self action:@selector(onSpeedUpSliderValueChange:) forControlEvents:UIControlEventValueChanged];
-        _speedUpSlider.continuous = NO;
-        [self addSubview:_speedUpSlider];
+        _cutTipsLabel = [[UILabel alloc] init];
+        _cutTipsLabel.text = @"请选择视频的剪裁区域";
+        _cutTipsLabel.font = [UIFont systemFontOfSize:14];
+        _cutTipsLabel.textAlignment = NSTextAlignmentCenter;
+        [self addSubview:_cutTipsLabel];
         
-        _speedLabel = [UILabel new];
-        _speedLabel.text = [NSString stringWithFormat:@" %.1f", 1.0];
-        _speedLabel.font = [UIFont systemFontOfSize:14];
-        _speedLabel.textColor = UIColorFromRGB(0x777777);
-        _speedLabel.textAlignment = NSTextAlignmentRight;
-        [_speedLabel sizeToFit];
-        [self addSubview:_speedLabel];
-        
-        TXVideoInfo *videoMsg = [TXVideoInfoReader getVideoInfo:_videoPath];
+        TXVideoInfo *videoMsg = [TXVideoInfoReader getVideoInfoWithAsset:_videoAssert];
         _duration   = videoMsg.duration;
-        
         
         //显示微缩图列表
         _imageList = [NSMutableArray new];
-        int imageNum = 10;
+        int imageNum = 12;
         
-        [TXVideoInfoReader getSampleImages:imageNum videoPath:_videoPath progress:^(int number, UIImage *image) {
-            if (number == 1) {
-                _videoRangeSlider = [[VideoRangeSlider alloc] initWithFrame:CGRectMake(0, _cutTipLabel.bottom + 50 * kScaleY, self.width, MIDDLE_LINE_HEIGHT)];
-                [self addSubview:_videoRangeSlider];
-                _videoRangeSlider.delegate = self;
-                for (int i = 0; i < imageNum; i++) {
-                    [_imageList addObject:image];
-                }
-                [_videoRangeSlider setImageList:_imageList];
-                [_videoRangeSlider setDurationMs:_duration];
-            } else {
-                if (number > imageNum) {
-                    return;
-                }
-                _imageList[number-1] = image;
-                [_videoRangeSlider updateImage:image atIndex:number-1];
+        _isContinue = YES;
+        [TXVideoInfoReader getSampleImages:imageNum videoAsset:_videoAssert progress:^BOOL(int number, UIImage *image) {
+            if (!_isContinue) {
+                return NO;
+            }else{
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    if (!_isContinue) {
+                        return;
+                    }
+                    if (number == 1) {
+                        _videoRangeSlider.delegate = self;
+                        for (int i = 0; i < imageNum; i++) {
+                            [_imageList addObject:image];
+                        }
+                        [_videoRangeSlider setImageList:_imageList];
+                        [_videoRangeSlider setDurationMs:_duration];
+                    } else {
+                        _imageList[number-1] = image;
+                        [_videoRangeSlider updateImage:image atIndex:number-1];
+                    }
+                });
+                return YES;
             }
         }];
     }
     return self;
 }
 
+- (void)stopGetImageList
+{
+    _isContinue = NO;
+}
 
 - (void)layoutSubviews
 {
     [super layoutSubviews];
     
-    _cutTipLabel.frame = CGRectMake(0, 0, self.width, 14);
-    _timeTipsLabel.frame = CGRectMake(0, _cutTipLabel.bottom + 20 * kScaleY, self.width, 20);
-    _videoRangeSlider.frame = CGRectMake(0, _timeTipsLabel.bottom + 10 * kScaleY, self.width, MIDDLE_LINE_HEIGHT);
-    _speedUpBtn.frame = CGRectMake(self.width / 2 - 18 * kScaleX, _videoRangeSlider.bottom + 30 * kScaleY, 36 * kScaleX, 36 * kScaleY);
-    
-    [_speedTipLabel sizeToFit];
-    [_speedLabel sizeToFit];
-    _speedTipLabel.frame = CGRectMake(15 * kScaleX, _videoRangeSlider.bottom + 25 * kScaleY, _speedTipLabel.width, 20);
-    _speedUpSlider.frame = CGRectMake(_speedTipLabel.right + 10 * kScaleX, _speedTipLabel.y, self.width - 50 * kScaleX - _speedLabel.width - _speedTipLabel.width, 20);
-    _speedLabel.frame = CGRectMake(_speedUpSlider.right + 10 * kScaleX, _speedTipLabel.y, _speedLabel.width, 20);
+    _timeTipsLabel.frame = CGRectMake(self.width / 2 - 30 * kScaleX, 0, 60 * kScaleX, 20 * kScaleY);
+    _videoRangeSlider.frame = CGRectMake(0, _timeTipsLabel.bottom, self.width,  MIDDLE_LINE_HEIGHT);
 }
 
 - (void)dealloc
@@ -143,25 +119,38 @@
     _timeTipsLabel.text = [NSString stringWithFormat:@"%.2f s",time];
 }
 
-
-#pragma mark - UI Control event handle
-- (void)onSpeedUpSliderValueChange:(UISlider*)slider
+- (void)setCenterPanHidden:(BOOL)isHidden
 {
-    CGFloat level = slider.value;
-    _speedLabel.text = [NSString stringWithFormat:@"%.1f", level];
-    [self.delegate onSetSpeedUpLevel:level];
+    [_videoRangeSlider setCenterPanHidden:isHidden];
 }
 
-- (void)onSpeedUpBtnClicked:(UIButton*)sender
+- (void)setCenterPanFrame:(CGFloat)time
 {
-    if (_isSpeedUp) {
-        [sender setBackgroundImage:[UIImage imageNamed:@"2xspeed" ] forState:UIControlStateNormal];
-    } else {
-        [sender setBackgroundImage:[UIImage imageNamed:@"2xspeedpressed"] forState:UIControlStateNormal];
-    }
-    
-    _isSpeedUp = !_isSpeedUp;
-    [self.delegate onSetSpeedUp:_isSpeedUp];
+    [_videoRangeSlider setCenterPanFrame:time];
+}
+
+- (void)setEffectDeleteBtnHidden:(BOOL)isHidden
+{
+    [_effectDeleteBtn setHidden:isHidden];
+}
+
+- (void)startColoration:(UIColor *)color alpha:(CGFloat)alpha
+{
+    [_videoRangeSlider startColoration:color alpha:alpha];
+}
+- (void)stopColoration
+{
+    [_videoRangeSlider stopColoration];
+}
+- (void)removeLastColoration
+{
+    [_videoRangeSlider removeLastColoration];
+}
+
+- (void)onEffectDelete
+{
+    [self removeLastColoration];
+    [self.delegate onEffectDelete];
 }
 
 #pragma mark - VideoRangeDelegate
@@ -176,6 +165,17 @@
     _videoRangeSlider.currentPos = sender.leftPos;
     _timeTipsLabel.text = [NSString stringWithFormat:@"%.2f s",sender.leftPos];
     [self.delegate onVideoCutChangedEnd:sender];
+}
+
+//中拉
+- (void)onVideoRangeCenterChanged:(VideoRangeSlider *)sender
+{
+    [self.delegate onVideoCenterRepeatChanged:sender];
+}
+
+- (void)onVideoRangeCenterChangeEnded:(VideoRangeSlider *)sender
+{
+    [self.delegate onVideoCenterRepeatEnd:sender];
 }
 
 //右拉

@@ -18,3 +18,11 @@
 @property (nonatomic) UILabel* textLabel;
 
 @end
+
+
+
+@interface PasterCollectionCell : UICollectionViewCell
+
+@property (nonatomic) UIImageView* imageView;
+
+@end

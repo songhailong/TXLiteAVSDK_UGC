@@ -13,6 +13,9 @@ enum EventID
 			 PUSH_EVT_CHANGE_BITRATE          =  1006,   // 推流动态调整码率
 			 PUSH_EVT_FIRST_FRAME_AVAILABLE   =  1007,   // 首帧画面采集完成
 			 PUSH_EVT_START_VIDEO_ENCODER     =  1008,   // 编码器启动
+             PUSH_EVT_ROOM_IN                 =  1018,   // 已经在webrtc房间里面，进房成功后通知
+             PUSH_EVT_ROOM_OUT                =  1019,   // 不在webrtc房间里面，进房失败或者中途退出房间时通知
+             PUSH_EVT_ROOM_USERLIST           =  1020,   // 下发webrtc房间成员列表(不包括自己)
 
 	/*step1*/    PUSH_ERR_OPEN_CAMERA_FAIL        = -1301,   // 打开摄像头失败
 /*step1*/    PUSH_ERR_OPEN_MIC_FAIL           = -1302,   // 打开麦克风失败

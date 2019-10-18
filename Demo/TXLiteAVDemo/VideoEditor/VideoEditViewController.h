@@ -7,11 +7,12 @@
 //
 
 #import <UIKit/UIKit.h>
+#import <AVFoundation/AVFoundation.h>
 
 @interface VideoEditViewController : UIViewController
 
 @property (strong,nonatomic) NSString *videoPath;
 
-@property (strong,nonatomic) NSArray  *videoPathList;
+@property (strong,nonatomic) AVAsset  *videoAsset;
 
 @end

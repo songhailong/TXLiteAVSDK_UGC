@@ -11,6 +11,9 @@
 #import "UIView+CustomAutoLayout.h"
 #import "VideoRangeConst.h"
 
+@implementation VideoColorInfo
+
+@end
 
 @interface VideoRangeSlider()<RangeContentDelegate, UIScrollViewDelegate>
 
@@ -19,6 +22,10 @@
 @end
 
 @implementation VideoRangeSlider
+{
+     NSMutableArray <VideoColorInfo *> *_colorInfos;
+     BOOL  _startColor;
+}
 
 /*
 // Only override drawRect: if you perform custom drawing.
@@ -48,7 +55,9 @@
         [self addSubview:imageView];
         imageView;
     });
-
+    
+    _colorInfos = [NSMutableArray array];
+    _startColor = NO;
     return self;
 }
 
@@ -56,6 +65,7 @@
     [super layoutSubviews];
     self.bgScrollView.width = self.width;
     self.middleLine.center = self.bgScrollView.center = CGPointMake(self.width/2, self.height/2);
+    self.middleLine.bounds = CGRectMake(0, 0, 2, self.height - 30);
 }
 
 
@@ -90,11 +100,54 @@
     self.rangeContent.imageViewList[index].image = image;
 }
 
+- (void)setCenterPanHidden:(BOOL)isHidden
+{
+    self.rangeContent.centerPin.hidden = isHidden;
+}
+
+- (void)setCenterPanFrame:(CGFloat)time
+{
+    self.rangeContent.centerPinCenterX = time / _durationMs * self.rangeContent.width;
+    self.rangeContent.centerPin.center = CGPointMake( self.rangeContent.centerPinCenterX, self.rangeContent.centerPin.center.y);
+}
+
+- (void)startColoration:(UIColor *)color alpha:(CGFloat)alpha
+{
+    VideoColorInfo *info = [[VideoColorInfo alloc] init];
+    info.colorView = [UIView new];
+    info.colorView.backgroundColor = color;
+    info.colorView.alpha = alpha;
+    info.colorView.userInteractionEnabled = NO;
+    info.startPos = _currentPos;
+    [_colorInfos addObject:info];
+    
+    [self.rangeContent insertSubview:info.colorView belowSubview:self.rangeContent.leftPin];
+    _startColor = YES;
+}
+
+- (void)stopColoration
+{
+    VideoColorInfo *info = [_colorInfos lastObject];
+    info.endPos = _currentPos;
+    _startColor = NO;
+}
+
+- (void)removeLastColoration
+{
+    VideoColorInfo *info = [_colorInfos lastObject];
+    [info.colorView removeFromSuperview];
+    [_colorInfos removeObject:info];
+}
+
 - (void)setDurationMs:(CGFloat)durationMs {
     _durationMs = durationMs;
     _leftPos = 0;
     _rightPos = _durationMs;
     [self setCurrentPos:_currentPos];
+    
+    _leftPos =  self.durationMs * self.rangeContent.leftScale;
+    _centerPos = self.durationMs * self.rangeContent.centerScale;
+    _rightPos = self.durationMs * self.rangeContent.rightScale;
 }
 
 - (void)setCurrentPos:(CGFloat)currentPos
@@ -104,14 +157,25 @@
         return;
     }
     CGFloat off = currentPos * self.rangeContent.imageListWidth / _durationMs;
-//    off += self.rangeContent.leftPin.width;
+    //    off += self.rangeContent.leftPin.width;
     off -= self.bgScrollView.contentInset.left;
     
     self.disableSeek = YES;
     self.bgScrollView.contentOffset = CGPointMake(off, 0);
+    
+    VideoColorInfo *info = [_colorInfos lastObject];
+    if (_startColor) {
+        CGFloat x = 0;
+        if (_currentPos > info.startPos) {
+            x = self.rangeContent.pinWidth + info.startPos * self.rangeContent.imageListWidth / _durationMs;
+        }else{
+            x = self.rangeContent.pinWidth + _currentPos * self.rangeContent.imageListWidth / _durationMs;
+        }
+        CGFloat width = fabs(_currentPos - info.startPos) * self.rangeContent.imageListWidth / _durationMs;
+        info.colorView.frame = CGRectMake(x, 0, width, self.height);
+    }
     self.disableSeek = NO;
 }
-
 
 #pragma Delegate -
 #pragma TXVideoRangeContentDelegate
@@ -131,6 +195,24 @@
     
     [self.delegate onVideoRangeLeftChangeEnded:self];
     
+}
+
+- (void)onRangeCenterChanged:(RangeContent *)sender
+{
+    _leftPos  = self.durationMs * sender.leftScale;
+    _rightPos = self.durationMs * sender.rightScale;
+    _centerPos =  self.durationMs * sender.centerScale;
+    
+    [self.delegate onVideoRangeCenterChanged:self];
+}
+
+- (void)onRangeCenterChangeEnded:(RangeContent *)sender
+{
+    _leftPos  = self.durationMs * sender.leftScale;
+    _rightPos = self.durationMs * sender.rightScale;
+    _centerPos =  self.durationMs * sender.centerScale;
+    
+    [self.delegate onVideoRangeCenterChangeEnded:self];
 }
 
 - (void)onRangeRightChanged:(RangeContent *)sender

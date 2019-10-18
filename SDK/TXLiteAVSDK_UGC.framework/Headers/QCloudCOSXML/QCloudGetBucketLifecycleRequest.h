@@ -29,13 +29,21 @@
 #import <QCloudCore/QCloudCore.h>
 #import "QCloudLifecycleConfiguration.h"
 NS_ASSUME_NONNULL_BEGIN
+
+/**
+ Get Bucket Lifecycle 用来查询 Bucket 的生命周期配置。如果该 Bucket 没有配置生命周期规则会返回 NoSuchLifecycleConfiguration。
+ */
 @interface QCloudGetBucketLifecycleRequest : QCloudBizHTTPRequest
 /**
 需要获取lifecycle的存储桶名
 */
 @property (strong, nonatomic) NSString *bucket;
 
-
+/**
+ 请求完成后的会通过该block回调，返回结果，若error为空，即为成功。
+ 
+ @param QCloudRequestFinishBlock 回调bock
+ */
 - (void) setFinishBlock:(void (^)(QCloudLifecycleConfiguration* result, NSError * error))QCloudRequestFinishBlock;
 @end
 NS_ASSUME_NONNULL_END

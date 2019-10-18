@@ -9,7 +9,7 @@
 #import "VideoPreview.h"
 #import "UIView+Additions.h"
 #import <AVFoundation/AVFoundation.h>
-#import <TXRTMPSDK/TXUGCRecordListener.h>
+#import "TXVideoEditerListener.h"
 
 #undef _MODULE_
 #define _MODULE_ "TXVideoPreview"
@@ -32,6 +32,7 @@
     UIImageView *_coverView;
     CGFloat     _currentTime;
     BOOL        _videoIsPlay;
+    BOOL        _appInbackground;
 }
 - (instancetype)initWithFrame:(CGRect)frame coverImage:(UIImage *)image
 {
@@ -60,6 +61,14 @@
         [[NSNotificationCenter defaultCenter] addObserver:self
                                                  selector:@selector(applicationDidEnterBackground:)
                                                      name:UIApplicationDidEnterBackgroundNotification
+                                                   object:nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(applicationDidBecomeActive:)
+                                                     name:UIApplicationDidBecomeActiveNotification
+                                                   object:nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(applicationWillResignActive:)
+                                                     name:UIApplicationWillResignActiveNotification
                                                    object:nil];
          [[NSNotificationCenter defaultCenter] addObserver:self
                                                   selector:@selector(onAudioSessionEvent:)
@@ -100,7 +109,12 @@
 
 - (void)applicationWillEnterForeground:(NSNotification *)noti
 {
-    //to do
+    if (_appInbackground){
+        if (_delegate && [_delegate respondsToSelector:@selector(onVideoWillEnterForeground)]) {
+            [_delegate onVideoWillEnterForeground];
+        }
+        _appInbackground = NO;
+    }
 }
 
 - (void)applicationDidEnterBackground:(NSNotification *)noti
@@ -108,8 +122,34 @@
     if (_videoIsPlay) {
         [self playBtnClick];
     }
-    if (_delegate && [_delegate respondsToSelector:@selector(onVideoEnterBackground)]) {
-        [_delegate onVideoEnterBackground];
+    if (!_appInbackground) {
+        if (_delegate && [_delegate respondsToSelector:@selector(onVideoEnterBackground)]) {
+            [_delegate onVideoEnterBackground];
+        }
+        _appInbackground = YES;
+    }
+}
+
+- (void)applicationDidBecomeActive:(NSNotification *)noti
+{
+    if (_appInbackground){
+        if (_delegate && [_delegate respondsToSelector:@selector(onVideoWillEnterForeground)]) {
+            [_delegate onVideoWillEnterForeground];
+        }
+        _appInbackground = NO;
+    }
+}
+
+- (void)applicationWillResignActive:(NSNotification *)noti
+{
+    if (_videoIsPlay) {
+        [self playBtnClick];
+    }
+    if (!_appInbackground) {
+        if (_delegate && [_delegate respondsToSelector:@selector(onVideoEnterBackground)]) {
+            [_delegate onVideoEnterBackground];
+        }
+        _appInbackground = YES;
     }
 }
 
@@ -118,11 +158,11 @@
     NSDictionary *info = notification.userInfo;
     AVAudioSessionInterruptionType type = [info[AVAudioSessionInterruptionTypeKey] unsignedIntegerValue];
     if (type == AVAudioSessionInterruptionTypeBegan) {
-//        if (_videoIsPlay) {
-//            [self playBtnClick];
-//        }
-        if (_delegate && [_delegate respondsToSelector:@selector(onVideoPause)]) {
-            [_delegate onVideoPause];
+        if (!_appInbackground) {
+            if (_delegate && [_delegate respondsToSelector:@selector(onVideoEnterBackground)]) {
+                [_delegate onVideoEnterBackground];
+            }
+            _appInbackground = YES;
         }
         _coverView.hidden = YES;
         if (_videoIsPlay) {

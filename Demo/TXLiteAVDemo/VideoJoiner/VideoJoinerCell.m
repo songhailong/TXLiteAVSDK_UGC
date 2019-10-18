@@ -7,7 +7,7 @@
 //
 
 #import "VideoJoinerCell.h"
-#import <TXRTMPSDK/TXVideoEditer.h>
+#import "TXVideoEditer.h"
 
 @implementation VideoJoinerCellModel
 

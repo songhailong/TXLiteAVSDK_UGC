@@ -30,6 +30,10 @@
 #import "QCloudInitiateMultipartUploadResult.h"
 #import "QCloudCOSStorageClassEnum.h"
 NS_ASSUME_NONNULL_BEGIN
+
+/**
+ Initiate Multipart Upload 接口请求实现初始化分片上传，成功执行此请求以后会返回 UploadId 用于后续的 Upload Part 请求。
+ */
 @interface QCloudInitiateMultipartUploadRequest : QCloudBizHTTPRequest
 /**
 对象的名称
@@ -83,7 +87,11 @@ RFC 2616 中定义的文件名称，将作为 Object 元数据保存。
 */
 @property (strong, nonatomic) NSString *grantFullControl;
 
-
+/**
+ 请求完成后的会通过该block回调，返回结果，若error为空，即为成功。
+ 
+ @param QCloudRequestFinishBlock 回调bock
+ */
 - (void) setFinishBlock:(void (^)(QCloudInitiateMultipartUploadResult* result, NSError * error))QCloudRequestFinishBlock;
 @end
 NS_ASSUME_NONNULL_END

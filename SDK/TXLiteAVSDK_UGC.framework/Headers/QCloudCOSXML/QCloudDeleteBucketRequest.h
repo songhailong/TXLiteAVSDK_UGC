@@ -28,6 +28,10 @@
 #import <Foundation/Foundation.h>
 #import <QCloudCore/QCloudCore.h>
 NS_ASSUME_NONNULL_BEGIN
+
+/**
+ Delete Bucket 接口请求可以在指定账号下删除 Bucket，删除之前要求 Bucket 内的内容为空，只有删除了 Bucket 内的信息，才能删除 Bucket 本身。
+ */
 @interface QCloudDeleteBucketRequest : QCloudBizHTTPRequest
 /**
 要删除的存储桶名。注意删除之前要求bucket里的内容为空。

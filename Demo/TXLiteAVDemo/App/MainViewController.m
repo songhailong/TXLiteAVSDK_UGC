@@ -20,9 +20,6 @@
 #import "VideoConfigureViewController.h"
 #import "QBImagePickerController.h"
 #endif
-#if defined(ENABLE_PLAY) && defined(ENABLE_AV)
-#import "LiveAVViewController.h"
-#endif
 
 #import "VideoLoadingController.h"
 #import "ColorMacro.h"
@@ -62,23 +59,6 @@ UITableViewDataSource
     _cellInfos = [NSMutableArray new];
     CellInfo* cellInfo = nil;
     
-    
-#if defined(ENABLE_PLAY) && defined(ENABLE_PUSH)
-    cellInfo = [CellInfo new];
-    cellInfo.title = @"在线答题室";
-    cellInfo.iconName = @"qa";
-    cellInfo.navigateToController = @"AnswerRoomListViewController";
-    [_cellInfos addObject:cellInfo];
-#endif
-
-#if defined(ENABLE_PLAY)
-    cellInfo = [CellInfo new];
-    cellInfo.title = @"答题播放器";
-    cellInfo.iconName = @"qa";
-    cellInfo.navigateToController = @"AnswerPlayViewController";
-    [_cellInfos addObject:cellInfo];
-#endif
-    
 #if defined(ENABLE_PLAY) && defined(ENABLE_PUSH)
     cellInfo = [CellInfo new];
     cellInfo.title = @"直播体验室";
@@ -97,18 +77,24 @@ UITableViewDataSource
     cellInfo.iconName = @"multi_room";
     cellInfo.navigateToController = @"RTCMultiRoomListViewController";
     [_cellInfos addObject:cellInfo];
+    
+    cellInfo = [CellInfo new];
+    cellInfo.title = @"WebRTC";
+    cellInfo.iconName = @"multi_room";
+    cellInfo.navigateToController = @"WebRTCViewController";
+    [_cellInfos addObject:cellInfo];
 #endif
     
 #ifndef DISABLE_VOD
 #if OLD_VOD || DEBUG
     cellInfo = [CellInfo new];
-    cellInfo.title = @"点播播放器";
+    cellInfo.title = @"TXVodPlayer";
     cellInfo.iconName = @"vodplay";
     cellInfo.navigateToController = @"PlayVodViewController";
     [_cellInfos addObject:cellInfo];
 #endif
     cellInfo = [CellInfo new];
-    cellInfo.title = @"超级播放器";
+    cellInfo.title = @"点播播放器";
     cellInfo.iconName = @"vodplay";
     cellInfo.navigateToController = @"MoviePlayerViewController";
     [_cellInfos addObject:cellInfo];
@@ -141,11 +127,6 @@ UITableViewDataSource
     cellInfo.navigateToController = @"PublishViewController";
     [_cellInfos addObject:cellInfo];
     
-//    cellInfo = [CellInfo new];
-//    cellInfo.title = @"推流+";
-//    cellInfo.iconName = @"push";
-//    cellInfo.navigateToController = @"PublishViewController";
-//    [_cellInfos addObject:cellInfo];
 #endif
     
 #ifdef ENABLE_PLAY
@@ -171,24 +152,6 @@ UITableViewDataSource
     cellInfo.navigateToController = @"AVRoomViewController";
     [_cellInfos addObject:cellInfo];
 #endif
-
-
-//#if defined(ENABLE_PLAY) && defined(ENABLE_AV)
-//    cellInfo = [CellInfo new];
-//    cellInfo.title = @"直播+会议";
-//    cellInfo.iconName = @"avroom";
-//    cellInfo.navigateToController = @"LiveAVViewController";
-//    [_cellInfos addObject:cellInfo];
-//#endif
-    
-//#if defined(ENABLE_PUSH) && defined(ENABLE_PLAY)
-//    cellInfo = [CellInfo new];
-//    cellInfo.title = @"连麦";
-//    cellInfo.iconName = @"mic";
-//    cellInfo.navigateToController = @"LinkMicViewController";
-//    [_cellInfos addObject:cellInfo];
-//#endif
-
 }
 
 - (void)initUI
@@ -278,16 +241,6 @@ UITableViewDataSource
     NSString* controllerClassName = cellInfo.navigateToController;
     Class controllerClass = NSClassFromString(controllerClassName);
     id controller = [[controllerClass alloc] init];
-
-    
-#ifdef ENABLE_PUSH
-//    if ([cellInfo.title isEqualToString:@"推流"]) {
-//        ((PublishViewController*)controller).enableNearestIP = NO;
-//    }
-//    if ([cellInfo.title isEqualToString:@"推流+"]) {
-//        ((PublishViewController*)controller).enableNearestIP = YES;
-//    }
-#endif
     
 #ifdef ENABLE_PLAY
     if ([cellInfo.title isEqualToString:@"直播播放器"]) {
@@ -298,12 +251,7 @@ UITableViewDataSource
         ((PlayViewController*)controller).isRealtime = YES;
     }
 #endif
-    
-#if defined(ENABLE_PLAY) && defined(ENABLE_AV)
-    if ([cellInfo.title isEqualToString:@"直播+会议"]) {
-        ((LiveAVViewController*)controller).isLivePlay = YES;
-    }
-#endif
+
     
 #ifdef ENABLE_UGC
     if ([controller isKindOfClass:[VideoConfigureViewController class]]) {

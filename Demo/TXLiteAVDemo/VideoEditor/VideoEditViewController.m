@@ -7,9 +7,8 @@
 //
 
 #import "VideoEditViewController.h"
-#import <TXRTMPSDK/TXVideoEditer.h>
+#import "TXVideoEditer.h"
 #import <MediaPlayer/MPMediaPickerController.h>
-#import <AVFoundation/AVFoundation.h>
 #import "VideoPreview.h"
 #import "VideoRangeSlider.h"
 #import "VideoRangeConst.h"
@@ -22,9 +21,12 @@
 #import "BottomTabBar.h"
 #import "VideoCutView.h"
 #import "MusicMixView.h"
+#import "PasterAddView.h"
 #import "TextAddView.h"
-#import "MusicCollectionViewController.h"
+#import "TimeSelectView.h"
+#import "EffectSelectView.h"
 #import "VideoTextViewController.h"
+#import "VideoPasterViewController.h"
 
 typedef  NS_ENUM(NSInteger,ActionType)
 {
@@ -33,19 +35,22 @@ typedef  NS_ENUM(NSInteger,ActionType)
     ActionType_Save_Publish,
 };
 
-@interface VideoEditViewController ()<TXVideoGenerateListener,VideoPreviewDelegate, FilterSettingViewDelegate, BottomTabBarDelegate, VideoCutViewDelegate, MusicMixViewDelegate, TextAddViewDelegate, VideoTextViewControllerDelegate, MPMediaPickerControllerDelegate, UIActionSheetDelegate, UITabBarDelegate>
+typedef  NS_ENUM(NSInteger,TimeType)
+{
+    TimeType_Clear,
+    TimeType_Back,
+    TimeType_Repeat,
+    TimeType_Speed,
+};
+
+@interface VideoEditViewController ()<TXVideoGenerateListener,VideoPreviewDelegate, FilterSettingViewDelegate, BottomTabBarDelegate, VideoCutViewDelegate, MusicMixViewDelegate, PasterAddViewDelegate, TextAddViewDelegate, VideoPasterViewControllerDelegate, VideoTextViewControllerDelegate,VideoEffectViewDelegate,TimeSelectViewDelegate,MPMediaPickerControllerDelegate, UIActionSheetDelegate, UITabBarDelegate>
 
 @end
 
 @implementation VideoEditViewController
 {
-    TXVideoEditer     *_ugcEdit;        //sdk编辑器
-    VideoPreview  *_videoPreview;       //视频预览
-
-    //播放进度
-    UIProgressView* _playProgressView;
-    UILabel*        _startTimeLabel;
-    UILabel*        _endTimeLabel;
+    TXVideoEditer*   _ugcEdit;        //sdk编辑器
+    VideoPreview*    _videoPreview;   //视频预览
     
     //裁剪时间
     CGFloat         _leftTime;
@@ -61,16 +66,28 @@ typedef  NS_ENUM(NSInteger,ActionType)
     UIProgressView* _generateProgressView;
     UIButton*       _generateCannelBtn;
     
-    UIColor         *_barTintColor;
-
+    UILabel*        _cutTipsLabel;
+    UIColor*        _barTintColor;
+    
     BottomTabBar*       _bottomBar;     //底部栏
-    VideoCutView    *_videoCutView;     //裁剪
+    VideoCutView*       _videoCutView;  //裁剪
     FilterSettingView*  _filterView;    //滤镜
-    MusicMixView*       _musixMixView;   //混音
-    TextAddView*        _textView;      //字幕
+    MusicMixView*       _musixMixView;  //混音
     
-    NSMutableArray<VideoTextInfo*>* _videoTextInfos;  //保存己添加的字幕
+    PasterAddView*      _pasterView;         //贴图
+    TextAddView*        _textView;           //字幕
+    TimeSelectView*     _timeSelectView;     //时间特效栏
+    EffectSelectView*   _effectSelectView;   //动效选择
     
+    int                 _effectType;
+    TimeType            _timeType;
+    
+    NSMutableArray<VideoTextInfo*>*   _videoTextInfos;   //保存己添加的字幕
+    NSMutableArray<VideoPasterInfo*>* _videoPaterInfos;  //保存己添加的贴纸
+    NSString*     _filePath;
+    
+    BOOL  _isReverse;
+    CGFloat _playTime;
 }
 
 
@@ -82,6 +99,8 @@ typedef  NS_ENUM(NSInteger,ActionType)
         _cutPathList = [NSMutableArray array];
         _videoOutputPath = [NSTemporaryDirectory() stringByAppendingPathComponent:@"outputCut.mp4"];
         _videoTextInfos = [NSMutableArray new];
+        _videoPaterInfos = [NSMutableArray new];
+        _effectType = -1;
     }
     return self;
 }
@@ -89,21 +108,13 @@ typedef  NS_ENUM(NSInteger,ActionType)
 - (void)viewWillAppear:(BOOL)animated
 {
     [super viewWillAppear:animated];
-//    _barTintColor =  self.navigationController.navigationBar.barTintColor;
-//    self.navigationController.navigationBar.barTintColor =  UIColor.blackColor;
     self.navigationController.navigationBar.translucent  =  NO;
-    
-
-    
-//    [UIApplication sharedApplication].statusBarStyle = UIStatusBarStyleLightContent;
 }
 
 - (void)viewWillDisappear:(BOOL)animated
 {
     [super viewWillDisappear:animated];
-//    self.navigationController.navigationBar.barTintColor =  _barTintColor;
-    
-//    [UIApplication sharedApplication].statusBarStyle = UIStatusBarStyleDefault;
+    [_videoCutView stopGetImageList];
 }
 
 - (void)dealloc
@@ -114,6 +125,10 @@ typedef  NS_ENUM(NSInteger,ActionType)
 
 - (void)viewDidLoad {
     [super viewDidLoad];
+    if (_videoAsset == nil && _videoPath != nil) {
+        NSURL *avUrl = [NSURL fileURLWithPath:_videoPath];
+        _videoAsset = [AVAsset assetWithURL:avUrl];
+    }
     
     UILabel *barTitleLabel = [[UILabel alloc]initWithFrame:CGRectMake(0, 0 , 100, 44)];
     barTitleLabel.backgroundColor = [UIColor clearColor];
@@ -134,59 +149,52 @@ typedef  NS_ENUM(NSInteger,ActionType)
                                                                         target:self
                                                                         action:@selector(goSave)];
     self.navigationItem.rightBarButtonItem = customSaveButton;
-
+    
     self.view.backgroundColor = UIColor.blackColor;
     
-    
-    
-    _videoPreview = [[VideoPreview alloc] initWithFrame:CGRectMake(0, 0, self.view.width, 225 * kScaleY) coverImage:nil];
+    _videoPreview = [[VideoPreview alloc] initWithFrame:CGRectMake(0, 0, self.view.width, 350 * kScaleY) coverImage:nil];
     _videoPreview.delegate = self;
     [self.view addSubview:_videoPreview];
     
     
-    _playProgressView = [[UIProgressView alloc] initWithFrame:CGRectMake(0, _videoPreview.bottom, self.view.width, 6)];
-    _playProgressView.trackTintColor = UIColorFromRGB(0xd8d8d8);
-    _playProgressView.progressTintColor = UIColorFromRGB(0x0accac);
-    [self.view addSubview:_playProgressView];
-    
-    
-    _startTimeLabel = [[UILabel alloc] initWithFrame:CGRectMake(15, _playProgressView.bottom + 10 * kScaleY, 50, 12)];
-    _startTimeLabel.text = @"0:00";
-    _startTimeLabel.textAlignment = NSTextAlignmentLeft;
-    _startTimeLabel.font = [UIFont systemFontOfSize:12];
-    _startTimeLabel.textColor = UIColor.lightTextColor;
-    [self.view addSubview:_startTimeLabel];
-    
-    _endTimeLabel = [[UILabel alloc] initWithFrame:CGRectMake(self.view.width - 15 - 50, _playProgressView.bottom + 10, 50, 12)];
-    _endTimeLabel.text = @"0:00";
-    _endTimeLabel.textAlignment = NSTextAlignmentRight;
-    _endTimeLabel.font = [UIFont systemFontOfSize:12];
-    _endTimeLabel.textColor = UIColor.lightTextColor;
-    [self.view addSubview:_endTimeLabel];
-    
-    
-    TXVideoInfo *videoMsg = [TXVideoInfoReader getVideoInfo:_videoPath];
+    TXVideoInfo *videoMsg = [TXVideoInfoReader getVideoInfoWithAsset:_videoAsset];
     CGFloat duration = videoMsg.duration;
     _rightTime = duration;
-    _endTimeLabel.text = [NSString stringWithFormat:@"%d:%02d", (int)duration / 60, (int)duration % 60];
-   
     
     _bottomBar = [[BottomTabBar alloc] initWithFrame:CGRectMake(0, self.view.height - 64 - 50 * kScaleY, self.view.width, 50 * kScaleY)];
     _bottomBar.delegate = self;
     [self.view addSubview:_bottomBar];
     
-    CGFloat heightDist = 65 * kScaleY;
-    _videoCutView = [[VideoCutView alloc] initWithFrame:CGRectMake(0, _playProgressView.bottom + heightDist, self.view.width, _bottomBar.y - _playProgressView.bottom - heightDist) videoPath:_videoPath];
-    _videoCutView.delegate = self;
-    [self.view addSubview:_videoCutView];
+    CGFloat selectViewHeight = [UIScreen mainScreen].bounds.size.height >= 667 ? 90 * kScaleY : 80 * kScaleY;
+    _timeSelectView = [[TimeSelectView alloc] initWithFrame:CGRectMake(0, _bottomBar.top -  selectViewHeight, self.view.width, selectViewHeight)];
+    _timeSelectView.delegate = self;
     
-    _filterView = [[FilterSettingView alloc] initWithFrame:CGRectMake(0, _playProgressView.bottom + heightDist, self.view.width, _bottomBar.y - _playProgressView.bottom - heightDist)];
+    _effectSelectView = [[EffectSelectView alloc] initWithFrame:_timeSelectView.frame];
+    _effectSelectView.delegate = self;
+    
+    _cutTipsLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, _bottomBar.top -  100 * kScaleY, self.view.width, 90 * kScaleY)];
+    _cutTipsLabel.textAlignment = NSTextAlignmentCenter;
+    _cutTipsLabel.text = @"请拖拽两侧滑块选择剪裁区域";
+    _cutTipsLabel.textColor = [UIColor whiteColor];
+    _cutTipsLabel.font = [UIFont systemFontOfSize:16];
+    [self.view addSubview:_cutTipsLabel];
+
+    _videoCutView = [[VideoCutView alloc] initWithFrame:CGRectMake(0, _videoPreview.bottom, self.view.width, _timeSelectView.y - _videoPreview.bottom) videoPath:_videoPath videoAssert:_videoAsset];
+    _videoCutView.delegate = self;
+    [_videoCutView setCenterPanHidden:YES];
+    [self.view addSubview:_videoCutView];
+
+    
+    _filterView = [[FilterSettingView alloc] initWithFrame:CGRectMake(0, _videoPreview.bottom + 10 * kScaleY, self.view.width, _bottomBar.y - _videoPreview.bottom - 10 * kScaleY)];
     _filterView.delegate = self;
     
-    _musixMixView = [[MusicMixView alloc] initWithFrame:CGRectMake(0, _playProgressView.bottom + heightDist, self.view.width, _bottomBar.y - _playProgressView.bottom - heightDist)];
+    _musixMixView = [[MusicMixView alloc] initWithFrame:CGRectMake(0, _videoPreview.bottom + 10 * kScaleY, self.view.width, _bottomBar.y - _videoPreview.bottom - 10 * kScaleY)];
     _musixMixView.delegate = self;
-
-    _textView = [[TextAddView alloc] initWithFrame:CGRectMake(0, _playProgressView.bottom + heightDist, self.view.width, _bottomBar.y - _playProgressView.bottom - heightDist)];
+    
+    _pasterView = [[PasterAddView alloc] initWithFrame:CGRectMake(0, _videoPreview.bottom + 30 * kScaleY, self.view.width, _bottomBar.y - _videoPreview.bottom - 30 * kScaleY)];
+    _pasterView.delegate = self;
+    
+    _textView = [[TextAddView alloc] initWithFrame:CGRectMake(0, _videoPreview.bottom + 30 * kScaleY, self.view.width, _bottomBar.y - _videoPreview.bottom - 30 * kScaleY)];
     _textView.delegate = self;
     
     TXPreviewParam *param = [[TXPreviewParam alloc] init];
@@ -196,12 +204,19 @@ typedef  NS_ENUM(NSInteger,ActionType)
     _ugcEdit.generateDelegate = self;
     _ugcEdit.previewDelegate = _videoPreview;
     
-    [_ugcEdit setVideoPath:_videoPath];
+    //[_ugcEdit setVideoPath:_videoPath];
+    [_ugcEdit setVideoAsset:_videoAsset];
     
-    UIImage *image = [UIImage imageNamed:@"watermark"];
-    [_ugcEdit setWaterMark:image normalizationFrame:CGRectMake(0, 0, 0.3 , 0.3 * image.size.height / image.size.width)];
+    UIImage *waterimage = [UIImage imageNamed:@"watermark"];
+    [_ugcEdit setWaterMark:waterimage normalizationFrame:CGRectMake(0.01, 0.01, 0.3 , 0)];
     
- 
+    UIImage *tailWaterimage = [UIImage imageNamed:@"tcloud_logo"];
+    float w = 0.15;
+    float x = (1.0 - w) / 2.0;
+    float width = w * videoMsg.width;
+    float height = width * tailWaterimage.size.height / tailWaterimage.size.width;
+    float y = (videoMsg.height - height) / 2 / videoMsg.height;
+    [_ugcEdit setTailWaterMark:tailWaterimage normalizationFrame:CGRectMake(x,y,w,0) duration:2];
 }
 
 - (UIView*)generatingView
@@ -246,7 +261,9 @@ typedef  NS_ENUM(NSInteger,ActionType)
 {
     [super viewDidAppear:animated];
     
-    [_videoPreview playVideo];
+    if (!_videoPreview.isPlaying) {
+        [_videoPreview playVideo];
+    }
 }
 
 - (void)goBack
@@ -259,20 +276,21 @@ typedef  NS_ENUM(NSInteger,ActionType)
 - (void)goSave
 {
     [self pause];
-
+    
     _actionType = ActionType_Save;
-
-
-//    MBProgressHUD *hud = [MBProgressHUD showHUDAddedTo:self.view animated:YES];
-//    hud.label.text = @"视频生成中...";
-//    _isGenerating = YES;
+    
+    
+    //    MBProgressHUD *hud = [MBProgressHUD showHUDAddedTo:self.view animated:YES];
+    //    hud.label.text = @"视频生成中...";
+    //    _isGenerating = YES;
     _generationView = [self generatingView];
     _generationView.hidden = NO;
-
+    
     [_ugcEdit setCutFromTime:_leftTime toTime:_rightTime];
     [self checkVideoOutputPath];
-    [_ugcEdit generateVideo:VIDEO_COMPRESSED_540P videoOutputPath:_videoOutputPath];
-
+    
+    [_ugcEdit generateVideo:VIDEO_COMPRESSED_720P videoOutputPath:_videoOutputPath];
+    
     [self onVideoPause];
     [_videoPreview setPlayBtn:NO];
     
@@ -311,62 +329,227 @@ typedef  NS_ENUM(NSInteger,ActionType)
 #pragma mark - BottomTabBarDelegate
 - (void)onCutBtnClicked
 {
-//    [self pause];
+    //    [self pause];
     [_filterView removeFromSuperview];
     [_musixMixView removeFromSuperview];
+    [_pasterView removeFromSuperview];
     [_textView removeFromSuperview];
+    [_timeSelectView removeFromSuperview];
+    [_effectSelectView removeFromSuperview];
+
+    [self.view addSubview:_videoCutView];
+    [self.view addSubview:_cutTipsLabel];
+    [_videoCutView setEffectDeleteBtnHidden:YES];
+}
+
+-(void)onTimeBtnClicked
+{
+    [_filterView removeFromSuperview];
+    [_musixMixView removeFromSuperview];
+    [_pasterView removeFromSuperview];
+    [_textView removeFromSuperview];
+    [_effectSelectView removeFromSuperview];
+    [_cutTipsLabel removeFromSuperview];
+
+    [self.view addSubview:_videoCutView];
+    [self.view addSubview:_timeSelectView];
+    [_videoCutView setEffectDeleteBtnHidden:YES];
+}
+
+- (void)onEffectBtnClicked
+{
+    [_filterView removeFromSuperview];
+    [_musixMixView removeFromSuperview];
+    [_pasterView removeFromSuperview];
+    [_textView removeFromSuperview];
+    [_timeSelectView removeFromSuperview];
+    [_cutTipsLabel removeFromSuperview];
     
     [self.view addSubview:_videoCutView];
+    [self.view addSubview:_effectSelectView];
+    [_videoCutView setEffectDeleteBtnHidden:NO];
 }
+
 
 - (void)onFilterBtnClicked
 {
-//    [self pause];
+    //    [self pause];
     [_videoCutView removeFromSuperview];
     [_musixMixView removeFromSuperview];
+    [_pasterView removeFromSuperview];
     [_textView removeFromSuperview];
-    
+    [_timeSelectView removeFromSuperview];
+    [_effectSelectView removeFromSuperview];
+    [_cutTipsLabel removeFromSuperview];
     
     [self.view addSubview:_filterView];
+    _videoCutView.videoRangeSlider.hidden = NO;
 }
 
 - (void)onMusicBtnClicked
 {
-//    [self pause];
+    //    [self pause];
     [_filterView removeFromSuperview];
     [_videoCutView removeFromSuperview];
+    [_pasterView removeFromSuperview];
     [_textView removeFromSuperview];
+    [_timeSelectView removeFromSuperview];
+    [_effectSelectView removeFromSuperview];
+    [_cutTipsLabel removeFromSuperview];
     
     [self.view addSubview:_musixMixView];
+    _videoCutView.videoRangeSlider.hidden = NO;
+}
+
+- (void)onPasterBtnClicked
+{
+    //    [self pause];
+    [_filterView removeFromSuperview];
+    [_videoCutView removeFromSuperview];
+    [_musixMixView removeFromSuperview];
+    [_textView removeFromSuperview];
+    [_timeSelectView removeFromSuperview];
+    [_effectSelectView removeFromSuperview];
+    [_cutTipsLabel removeFromSuperview];
+    
+    [self.view addSubview:_pasterView];
+    _videoCutView.videoRangeSlider.hidden = NO;
 }
 
 - (void)onTextBtnClicked
 {
-//    [self pause];
+    //    [self pause];
     [_filterView removeFromSuperview];
     [_videoCutView removeFromSuperview];
     [_musixMixView removeFromSuperview];
+    [_pasterView removeFromSuperview];
+    [_timeSelectView removeFromSuperview];
+    [_effectSelectView removeFromSuperview];
+    [_cutTipsLabel removeFromSuperview];
     
     [self.view addSubview:_textView];
+    _videoCutView.videoRangeSlider.hidden = NO;
+}
+
+#pragma mark VideoEffectViewDelegate
+- (void)onVideoEffectBeginClick:(TXEffectType)effectType
+{
+    _effectType = effectType;
+    switch ((TXEffectType)_effectType) {
+        case TXEffectType_ROCK_LIGHT:
+            [_videoCutView startColoration:UIColorFromRGB(0xEC5F9B) alpha:0.7];
+            break;
+        case TXEffectType_DARK_DRAEM:
+            [_videoCutView startColoration:UIColorFromRGB(0xEC8435) alpha:0.7];
+            break;
+        case TXEffectType_SOUL_OUT:
+            [_videoCutView startColoration:UIColorFromRGB(0x1FBCB6) alpha:0.7];
+            break;
+        case TXEffectType_SCREEN_SPLIT:
+            [_videoCutView startColoration:UIColorFromRGB(0x449FF3) alpha:0.7];
+            break;
+        default:
+            break;
+    }
+    [_ugcEdit startEffect:(TXEffectType)_effectType startTime:_playTime];
+    if (!_isReverse) {
+        [_ugcEdit startPlayFromTime:_videoCutView.videoRangeSlider.currentPos toTime:_videoCutView.videoRangeSlider.rightPos];
+    }else{
+        [_ugcEdit startPlayFromTime:_videoCutView.videoRangeSlider.leftPos toTime:_videoCutView.videoRangeSlider.currentPos];
+    }
+    [_videoPreview setPlayBtn:YES];
+}
+
+- (void)onVideoEffectEndClick:(TXEffectType)effectType
+{
+    if (_effectType != -1) {
+        [_videoPreview setPlayBtn:NO];
+        [_videoCutView stopColoration];
+        [_ugcEdit stopEffect:effectType endTime:_playTime];
+        [_ugcEdit pausePlay];
+        _effectType = -1;
+    }
+}
+
+#pragma mark TimeSelectViewDelegate
+- (void)onVideoTimeEffectsClear
+{
+    _timeType = TimeType_Clear;
+    _isReverse = NO;
+    [_ugcEdit setReverse:_isReverse];
+    [_ugcEdit setRepeatPlay:nil];
+    [_ugcEdit setSpeedList:nil];
+    [_ugcEdit startPlayFromTime:_videoCutView.videoRangeSlider.leftPos toTime:_videoCutView.videoRangeSlider.rightPos];
+    
+    [_videoPreview setPlayBtn:YES];
+    [_videoCutView setCenterPanHidden:YES];
+}
+- (void)onVideoTimeEffectsBackPlay
+{
+    _timeType = TimeType_Back;
+    _isReverse = YES;
+    [_ugcEdit setReverse:_isReverse];
+    [_ugcEdit setRepeatPlay:nil];
+    [_ugcEdit setSpeedList:nil];
+    [_ugcEdit startPlayFromTime:_videoCutView.videoRangeSlider.leftPos toTime:_videoCutView.videoRangeSlider.rightPos];
+    
+    [_videoPreview setPlayBtn:YES];
+    [_videoCutView setCenterPanHidden:YES];
+    _videoCutView.videoRangeSlider.hidden = NO;
+}
+- (void)onVideoTimeEffectsRepeat
+{
+    _timeType = TimeType_Repeat;
+    _isReverse = NO;
+    [_ugcEdit setReverse:_isReverse];
+    [_ugcEdit setSpeedList:nil];
+    TXRepeat *repeat = [[TXRepeat alloc] init];
+    repeat.startTime = _leftTime + (_rightTime - _leftTime) / 5;
+    repeat.endTime = repeat.startTime + 0.5;
+    repeat.repeatTimes = 3;
+    [_ugcEdit setRepeatPlay:@[repeat]];
+    [_ugcEdit startPlayFromTime:_videoCutView.videoRangeSlider.leftPos toTime:_videoCutView.videoRangeSlider.rightPos];
+    
+    [_videoPreview setPlayBtn:YES];
+    [_videoCutView setCenterPanHidden:NO];
+    [_videoCutView setCenterPanFrame:repeat.startTime];
+}
+
+- (void)onVideoTimeEffectsSpeed
+{
+    _timeType = TimeType_Speed;
+    _isReverse = NO;
+    [_ugcEdit setReverse:_isReverse];
+    [_ugcEdit setRepeatPlay:nil];
+    TXSpeed *speed =[[TXSpeed alloc] init];
+    speed.startTime = _leftTime + (_rightTime - _leftTime) * 1.5 / 5;
+    speed.endTime = _videoCutView.videoRangeSlider.rightPos;
+    speed.speedLevel = SPEED_LEVEL_SLOW;
+    [_ugcEdit setSpeedList:@[speed]];
+    [_ugcEdit startPlayFromTime:_videoCutView.videoRangeSlider.leftPos toTime:_videoCutView.videoRangeSlider.rightPos];
+    
+    [_videoPreview setPlayBtn:YES];
+    [_videoCutView setCenterPanHidden:NO];
+    [_videoCutView setCenterPanFrame:speed.startTime];
 }
 
 #pragma mark TXVideoGenerateListener
 -(void) onGenerateProgress:(float)progress
 {
-//    MBProgressHUD* hub = [MBProgressHUD HUDForView:self.view];
-//    hub.label.text = [NSString stringWithFormat:@"视频生成中:%.02f%%", progress * 100];
-    NSLog(@"progress === %f",progress);
+    //    MBProgressHUD* hub = [MBProgressHUD HUDForView:self.view];
+    //    hub.label.text = [NSString stringWithFormat:@"视频生成中:%.02f%%", progress * 100];
+    //NSLog(@"progress === %f",progress);
     _generateProgressView.progress = progress;
 }
 
 -(void) onGenerateComplete:(TXGenerateResult *)result
 {
-
+    
     _generationView.hidden = YES;
     if (result.retCode == 0) {
-
+        
         TXVideoInfo *videoInfo = [TXVideoInfoReader getVideoInfo:_videoOutputPath];
-        VideoPreviewViewController* vc = [[VideoPreviewViewController alloc] initWithCoverImage:videoInfo.coverImage videoPath:_videoOutputPath];
+        VideoPreviewViewController* vc = [[VideoPreviewViewController alloc] initWithCoverImage:videoInfo.coverImage videoPath:_videoOutputPath renderMode:RENDER_MODE_FILL_EDGE isFromRecord:NO];
         [self.navigationController pushViewController:vc animated:YES];
         
     }else{
@@ -383,7 +566,19 @@ typedef  NS_ENUM(NSInteger,ActionType)
 #pragma mark VideoPreviewDelegate
 - (void)onVideoPlay
 {
-    [_ugcEdit startPlayFromTime:_videoCutView.videoRangeSlider.currentPos toTime:_videoCutView.videoRangeSlider.rightPos];
+    CGFloat currentPos = _videoCutView.videoRangeSlider.currentPos;
+    if (currentPos < _leftTime || currentPos > _rightTime)
+        currentPos = _leftTime;
+    
+    if(_isReverse && currentPos != 0){
+        [_ugcEdit startPlayFromTime:0 toTime:currentPos];
+    }
+    else if(_videoCutView.videoRangeSlider.rightPos != 0){
+        [_ugcEdit startPlayFromTime:currentPos toTime:_videoCutView.videoRangeSlider.rightPos];
+    }
+    else{
+        [_ugcEdit startPlayFromTime:currentPos toTime:_rightTime];
+    }
 }
 
 - (void)onVideoPause
@@ -393,71 +588,111 @@ typedef  NS_ENUM(NSInteger,ActionType)
 
 - (void)onVideoResume
 {
-    //[_ugcEdit resumePlay];
+//    [_ugcEdit resumePlay];
     [self onVideoPlay];
 }
 
 - (void)onVideoPlayProgress:(CGFloat)time
 {
-    _playProgressView.progress = (time - _leftTime) / (_rightTime - _leftTime);
-    [_videoCutView setPlayTime:time];
-
+    _playTime = time;
+    [_videoCutView setPlayTime:_playTime];
 }
+
 - (void)onVideoPlayFinished
 {
-    [_ugcEdit startPlayFromTime:_leftTime toTime:_rightTime];
+    if (_effectType != -1) {
+        [self onVideoEffectEndClick:_effectType];
+    }else{
+        [_ugcEdit startPlayFromTime:_leftTime toTime:_rightTime];
+    }
 }
-
 
 - (void)onVideoEnterBackground
 {
-    [MBProgressHUD hideHUDForView:self.view animated:YES];
-//视频生成中不能进后台，因为使用硬编，会导致失败
-    if (_generationView && !_generationView.hidden) {
-        _generationView.hidden = YES;
-        [_ugcEdit cancelGenerate];
-        
-        UIAlertView *alertView = [[UIAlertView alloc] initWithTitle:@"视频生成失败"
-                                                            message:@"中途切后台导致,请重新保存"
-                                                           delegate:self
-                                                  cancelButtonTitle:@"知道了"
-                                                  otherButtonTitles:nil, nil];
-        [alertView show];
-    }
-    
+    [_ugcEdit pauseGenerate];
 }
 
-#pragma mark - MusicMixViewDelegate
-//打开本地系统音乐
-- (void)onOpenLocalMusicList
+- (void)onVideoWillEnterForeground
 {
-    [self pause];
-//    MusicCollectionViewController* vc = [[MusicCollectionViewController alloc] initWithCollectionViewLayout:[UICollectionViewFlowLayout new]];
-//    [self.navigationController pushViewController:vc animated:YES];
-    MPMediaPickerController *mpc = [[MPMediaPickerController alloc] initWithMediaTypes:MPMediaTypeAnyAudio];
-    mpc.delegate = self;
-    mpc.editing = YES;
-    mpc.allowsPickingMultipleItems = NO;
-    [self presentViewController:mpc animated:YES completion:nil];
+    [_ugcEdit resumeGenerate];
 }
 
-//设音量效果
-- (void)onSetVideoVolume:(CGFloat)videoVolume musicVolume:(CGFloat)musicVolume
+
+#pragma mark - VideoCutViewDelegate
+//裁剪
+- (void)onVideoLeftCutChanged:(VideoRangeSlider *)sender
 {
-    [_ugcEdit setVideoVolume:videoVolume];
-    [_ugcEdit setBGMVolume:musicVolume];
+    //[_ugcEdit pausePlay];
+    [_videoPreview setPlayBtn:NO];
+    [_ugcEdit previewAtTime:sender.leftPos];
 }
 
-//设音乐效果
-- (void)onSetBGMWithFilePath:(NSString *)filePath startTime:(CGFloat)startTime endTime:(CGFloat)endTime
+- (void)onVideoRightCutChanged:(VideoRangeSlider *)sender
 {
-    [_ugcEdit setBGM:filePath startTime:startTime endTime:endTime];
-    if (filePath == nil) {
-        [_ugcEdit setVideoVolume:1.f];
-    }
-    
-    [_ugcEdit startPlayFromTime:_leftTime toTime:_rightTime];
+    [_videoPreview setPlayBtn:NO];
+    [_ugcEdit previewAtTime:sender.rightPos];
+}
+
+- (void)onVideoCutChangedEnd:(VideoRangeSlider *)sender
+{
+    _leftTime = sender.leftPos;
+    _rightTime = sender.rightPos;
+    [_ugcEdit startPlayFromTime:sender.leftPos toTime:sender.rightPos];
     [_videoPreview setPlayBtn:YES];
+}
+
+- (void)onVideoCenterRepeatChanged:(VideoRangeSlider*)sender
+{
+    [_videoPreview setPlayBtn:NO];
+    [_ugcEdit previewAtTime:sender.centerPos];
+}
+
+- (void)onVideoCenterRepeatEnd:(VideoRangeSlider*)sender;
+{
+    _leftTime = sender.leftPos;
+    _rightTime = sender.rightPos;
+    
+    if (_timeType == TimeType_Repeat) {
+        TXRepeat *repeat = [[TXRepeat alloc] init];
+        repeat.startTime = sender.centerPos;
+        repeat.endTime = sender.centerPos + 0.5;
+        repeat.repeatTimes = 3;
+        [_ugcEdit setRepeatPlay:@[repeat]];
+        [_ugcEdit setSpeedList:nil];
+    }
+    else if (_timeType == TimeType_Speed) {
+        TXSpeed *speed = [[TXSpeed alloc] init];
+        speed.startTime = sender.centerPos;
+        speed.endTime = sender.rightPos;
+        speed.speedLevel = SPEED_LEVEL_SLOW;
+        [_ugcEdit setSpeedList:@[speed]];
+        [_ugcEdit setRepeatPlay:nil];
+    }
+    
+    if (_isReverse) {
+        [_ugcEdit startPlayFromTime:sender.leftPos toTime:sender.centerPos + 1.5];
+    }else{
+        [_ugcEdit startPlayFromTime:sender.centerPos toTime:sender.rightPos];
+    }
+    [_videoPreview setPlayBtn:YES];
+}
+
+- (void)onVideoCutChange:(VideoRangeSlider *)sender seekToPos:(CGFloat)pos
+{
+    _playTime = pos;
+    [_ugcEdit previewAtTime:_playTime];
+    [_videoPreview setPlayBtn:NO];
+}
+
+//美颜
+- (void)onSetBeautyDepth:(float)beautyDepth WhiteningDepth:(float)whiteningDepth
+{
+    [_ugcEdit setBeautyFilter:beautyDepth setWhiteningLevel:whiteningDepth];
+}
+
+- (void)onEffectDelete
+{
+    [_ugcEdit deleteLastEffect];
 }
 
 #pragma mark - TextAddViewDelegate
@@ -475,10 +710,31 @@ typedef  NS_ENUM(NSInteger,ActionType)
         [inRangeVideoTexts addObject:info];
     }
     
+    [_ugcEdit pausePlay];
+    [_videoPreview setPlayBtn:NO];
+    
     VideoTextViewController* vc = [[VideoTextViewController alloc] initWithVideoEditer:_ugcEdit previewView:_videoPreview startTime:_leftTime endTime:_rightTime videoTextInfos:inRangeVideoTexts];
     vc.delegate = self;
     UINavigationController* nav = [[UINavigationController alloc] initWithRootViewController:vc];
     [self presentViewController:nav animated:YES completion:nil];
+}
+
+- (void)onSetVideoPasterInfosFinish:(NSArray<VideoPasterInfo*>*)videoPasterInfos
+{
+    //更新贴纸信息
+    [_videoPaterInfos removeAllObjects];
+    [_videoPaterInfos addObjectsFromArray:videoPasterInfos];
+    
+    _videoPreview.frame = CGRectMake(0, 0, self.view.width, 350 * kScaleY);
+    _videoPreview.delegate = self;
+    [_videoPreview setPlayBtnHidden:NO];
+    [self.view addSubview:_videoPreview];
+    
+    if (videoPasterInfos.count > 0) {
+        [_textView setEdited:YES];
+    }else {
+        [_textView setEdited:NO];
+    }
 }
 
 #pragma mark - VideoTextViewControllerDelegate
@@ -506,8 +762,8 @@ typedef  NS_ENUM(NSInteger,ActionType)
     
     if (removedTexts.count > 0)
         [_videoTextInfos removeObjectsInArray:removedTexts];
- 
-    _videoPreview.frame = CGRectMake(0, 0, self.view.width, 225 * kScaleY);
+    
+    _videoPreview.frame = CGRectMake(0, 0, self.view.width, 350 * kScaleY);
     _videoPreview.delegate = self;
     [_videoPreview setPlayBtnHidden:NO];
     [self.view addSubview:_videoPreview];
@@ -519,6 +775,30 @@ typedef  NS_ENUM(NSInteger,ActionType)
         [_textView setEdited:NO];
     }
 }
+
+#pragma mark - PasterAddViewDelegate
+- (void)onAddPasterBtnClicked
+{
+    [_videoPreview removeFromSuperview];
+    
+    //己有添加字幕的话只操作本地裁剪时间内的
+    NSMutableArray* inRangeVideoPasters = [NSMutableArray new];
+    for (VideoPasterInfo* info in _videoPaterInfos) {
+        if (info.startTime >= _rightTime || info.endTime <= _leftTime)
+            continue;
+        
+        [inRangeVideoPasters addObject:info];
+    }
+    
+    [_ugcEdit pausePlay];
+    [_videoPreview setPlayBtn:NO];
+    
+    VideoPasterViewController* vc = [[VideoPasterViewController alloc] initWithVideoEditer:_ugcEdit previewView:_videoPreview startTime:_leftTime endTime:_rightTime videoPasterInfos:inRangeVideoPasters];
+    vc.delegate = self;
+    UINavigationController* nav = [[UINavigationController alloc] initWithRootViewController:vc];
+    [self presentViewController:nav animated:YES completion:nil];
+}
+
 
 #pragma mark - MPMediaPickerControllerDelegate
 - (void)mediaPicker:(MPMediaPickerController *)mediaPicker didPickMediaItems:(MPMediaItemCollection *)mediaItemCollection
@@ -576,7 +856,7 @@ typedef  NS_ENUM(NSInteger,ActionType)
     MBProgressHUD* hub = [MBProgressHUD showHUDAddedTo:self.view animated:YES];
     hub.label.text = @"音频读取中...";
     
-
+    
     
     // do the export
     //__weak typeof(self) weakSelf = self;
@@ -589,7 +869,7 @@ typedef  NS_ENUM(NSInteger,ActionType)
             case AVAssetExportSessionStatusFailed: {
                 NSLog (@"AVAssetExportSessionStatusFailed: %@", exporter.error);
                 break;
-
+                
             }
             case AVAssetExportSessionStatusCompleted: {
                 NSLog(@"AVAssetExportSessionStatusCompleted: %@", exporter.outputURL);
@@ -609,56 +889,59 @@ typedef  NS_ENUM(NSInteger,ActionType)
     }];
 }
 
-#pragma mark - VideoCutViewDelegate
-//裁剪
-- (void)onVideoLeftCutChanged:(VideoRangeSlider *)sender
+#pragma mark - MusicMixViewDelegate
+//打开本地系统音乐
+- (void)onOpenLocalMusicList
 {
-    //[_ugcEdit pausePlay];
-    [_videoPreview setPlayBtn:NO];
-    [_ugcEdit previewAtTime:sender.leftPos];
+    [self pause];
+
+    MPMediaPickerController *mpc = [[MPMediaPickerController alloc] initWithMediaTypes:MPMediaTypeAnyAudio];
+    mpc.delegate = self;
+    mpc.editing = YES;
+    mpc.allowsPickingMultipleItems = NO;
+    [self presentViewController:mpc animated:YES completion:nil];
 }
 
-- (void)onVideoRightCutChanged:(VideoRangeSlider *)sender
+//设音量效果
+- (void)onSetVideoVolume:(CGFloat)videoVolume musicVolume:(CGFloat)musicVolume
 {
-    [_videoPreview setPlayBtn:NO];
-    [_ugcEdit previewAtTime:sender.rightPos];
+    [_ugcEdit setVideoVolume:videoVolume];
+    [_ugcEdit setBGMVolume:musicVolume];
 }
 
-- (void)onVideoCutChangedEnd:(VideoRangeSlider *)sender
+- (void)onSetBGMWithFilePath:(NSString *)filePath startTime:(CGFloat)startTime endTime:(CGFloat)endTime
 {
-    _leftTime = sender.leftPos;
-    _rightTime = sender.rightPos;
-    _startTimeLabel.text = [NSString stringWithFormat:@"%d:%02d", (int)sender.leftPos / 60, (int)sender.leftPos % 60];
-    _endTimeLabel.text = [NSString stringWithFormat:@"%d:%02d", (int)sender.rightPos / 60, (int)sender.rightPos % 60];
-    [_ugcEdit startPlayFromTime:sender.leftPos toTime:sender.rightPos];
-    [_videoPreview setPlayBtn:YES];
-}
-
-- (void)onVideoCutChange:(VideoRangeSlider *)sender seekToPos:(CGFloat)pos
-{
-    [_ugcEdit previewAtTime:pos];
-    [_videoPreview setPlayBtn:NO];
-    _playProgressView.progress = (pos - _leftTime) / (_rightTime - _leftTime);
-}
-
-- (void)onSetSpeedUp:(BOOL)isSpeedUp
-{
-    if (isSpeedUp) {
-        [_ugcEdit setSpeedLevel:2.0];
-    } else {
-        [_ugcEdit setSpeedLevel:1.0];
+    if (![_filePath isEqualToString:filePath]) {
+        __weak __typeof(self) weakSelf = self;
+        [_ugcEdit setBGM:filePath result:^(int result) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (result == -1){
+                    UIAlertView *alertView = [[UIAlertView alloc] initWithTitle:@"设置背景音乐失败"
+                                                                        message:@"不支持当前格式的背景音乐!"
+                                                                       delegate:weakSelf
+                                                              cancelButtonTitle:@"知道了"
+                                                              otherButtonTitles:nil, nil];
+                    [alertView show];
+                }else{
+                    [weakSelf setBGMVolume:filePath startTime:startTime endTime:endTime];
+                }
+            });
+        }];
+    }else{
+        [self setBGMVolume:filePath startTime:startTime endTime:endTime];
     }
 }
 
-- (void)onSetSpeedUpLevel:(CGFloat)level
+-(void)setBGMVolume:(NSString *)filePath startTime:(CGFloat)startTime endTime:(CGFloat)endTime
 {
-    [_ugcEdit setSpeedLevel:level];
-}
-
-//美颜
-- (void)onSetBeautyDepth:(float)beautyDepth WhiteningDepth:(float)whiteningDepth
-{
-    [_ugcEdit setBeautyFilter:beautyDepth setWhiteningLevel:whiteningDepth];
+    _filePath = filePath;
+    [_ugcEdit setBGMStartTime:startTime endTime:endTime];
+    if (_filePath == nil) {
+        [_ugcEdit setVideoVolume:1.f];
+    }
+    
+    [_ugcEdit startPlayFromTime:_leftTime toTime:_rightTime];
+    [_videoPreview setPlayBtn:YES];
 }
 
 @end

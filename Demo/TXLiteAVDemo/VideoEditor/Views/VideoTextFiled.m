@@ -28,10 +28,17 @@
     UITextField*    _hiddenTextField;
     BOOL            _isInputting;
     
+    //气泡背景
+    UIImageView *   _bubbleView;
+    
     //己旋转角度
     CGFloat         _rotateAngle;
 
     NSInteger       _styleIndex;
+    
+    CGRect          _textNormalizationFrame;
+    CGRect          _initFrame;
+    BOOL            _hasSetBubble;
 }
 
 @end
@@ -42,23 +49,34 @@
 {
     if (self = [super initWithFrame:frame]) {
         _styleIndex = 0;
-        _textLabel = [UILabel new];
-        _textLabel.text = kDefaultText;
-        _textLabel.textColor = UIColor.whiteColor;
-        _textLabel.shadowOffset = CGSizeMake(2, 2);
-        _textLabel.font = [UIFont systemFontOfSize:18];
-        _textLabel.numberOfLines = 0;
-        UITapGestureRecognizer* singleTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(onTap:)];
-        singleTap.numberOfTapsRequired = 1;
-        _textLabel.userInteractionEnabled = YES;
-        [_textLabel sizeToFit];
-        [_textLabel addGestureRecognizer:singleTap];
+        _hasSetBubble = NO;
+        _textNormalizationFrame = CGRectMake(0, 0, 1, 1);
+        _initFrame = frame;
         
         _borderView = [UIImageView new];
         _borderView.layer.borderWidth = 1;
         _borderView.layer.borderColor = UIColorFromRGB(0x0accac).CGColor;
         _borderView.userInteractionEnabled = YES;
+        _borderView.backgroundColor = [UIColor clearColor];
         [self addSubview:_borderView];
+        
+        _bubbleView = [UIImageView new];
+        [_borderView addSubview:_bubbleView];
+        
+        _textLabel = [UILabel new];
+        _textLabel.text = kDefaultText;
+        _textLabel.textColor = UIColor.blackColor;
+        _textLabel.shadowOffset = CGSizeMake(2, 2);
+        _textLabel.font = [UIFont systemFontOfSize:18];
+        _textLabel.numberOfLines = 0;
+        _textLabel.textAlignment = NSTextAlignmentCenter;
+        UITapGestureRecognizer* singleTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(onTap:)];
+        singleTap.numberOfTapsRequired = 1;
+        _textLabel.userInteractionEnabled = YES;
+        [_textLabel sizeToFit];
+        [_textLabel addGestureRecognizer:singleTap];
+        [_borderView  addSubview:_textLabel];
+    
         
         _deleteBtn = [UIButton new];
         [_deleteBtn setImage:[UIImage imageNamed:@"videotext_delete"] forState:UIControlStateNormal];
@@ -103,7 +121,6 @@
         _hiddenTextField.inputAccessoryView = inputAccessoryView;
         [self addSubview:_hiddenTextField];
         
-        [_borderView  addSubview:_textLabel];
         
         UIPanGestureRecognizer* selfPanGensture = [[UIPanGestureRecognizer alloc] initWithTarget:self action: @selector (handlePanSlide:)];
         [self addGestureRecognizer:selfPanGensture];
@@ -119,6 +136,11 @@
                                                      name:UIKeyboardDidShowNotification
                                                    object:nil];
         
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(textViewDidChangeValue:)
+                                                     name:UITextViewTextDidChangeNotification
+                                                   object:_inputTextView];
+        
         
         _rotateAngle = 0.f;
     }
@@ -131,26 +153,43 @@
     [super layoutSubviews];
 
     CGPoint center = [self convertPoint:self.center fromView:self.superview];
-    _borderView.bounds = CGRectMake(0, 0, _textLabel.width + 20, _textLabel.height + 10);
+    
+    _borderView.bounds = CGRectMake(0, 0, self.bounds.size.width - 25, self.bounds.size.height - 25);
     _borderView.center = center;
     
-    _textLabel.center = [_borderView convertPoint:_borderView.center fromView:self];
+    _bubbleView.frame = CGRectMake(0, 0, _borderView.bounds.size.width, _borderView.bounds.size.height);
+    
+    _textLabel.center = CGPointMake(_bubbleView.bounds.size.width * (_textNormalizationFrame.origin.x + _textNormalizationFrame.size.width / 2), _bubbleView.bounds.size.height * (_textNormalizationFrame.origin.y + _textNormalizationFrame.size.height / 2));
+    _textLabel.bounds = CGRectMake(0, 0, _bubbleView.bounds.size.width * _textNormalizationFrame.size.width, _bubbleView.bounds.size.height * _textNormalizationFrame.size.height);
+    
     
     _deleteBtn.center = CGPointMake(_borderView.x, _borderView.y);
-    _deleteBtn.bounds = CGRectMake(0, 0, 30, 30);
+    _deleteBtn.bounds = CGRectMake(0, 0, 50, 50);
     
     _styleBtn.center = CGPointMake(_borderView.right, _borderView.top);
-    _styleBtn.bounds = CGRectMake(0, 0, 30, 30);
+    _styleBtn.bounds = CGRectMake(0, 0, 50, 50);
     
     _scaleRotateBtn.center = CGPointMake(_borderView.right, _borderView.bottom);
-    _scaleRotateBtn.bounds = CGRectMake(0, 0, 30, 30);
+    _scaleRotateBtn.bounds = CGRectMake(0, 0, 50, 50);
+    
+    if (_hasSetBubble) {
+        [self calculateTextLabelFont];
+    }
+}
+
+- (void)calculateTextLabelFont
+{
+    CGRect rect = [_textLabel.text boundingRectWithSize:CGSizeMake(_textLabel.width, MAXFLOAT) options:(NSStringDrawingUsesLineFragmentOrigin|NSStringDrawingUsesFontLeading) attributes:@{NSFontAttributeName:_textLabel.font} context:nil];
+    if (rect.size.height > _textLabel.height) {
+        _textLabel.font = [UIFont systemFontOfSize:_textLabel.font.pointSize - 0.1];
+        [self calculateTextLabelFont];
+    }
 }
 
 - (NSString*)text
 {
     return _textLabel.text;
 }
-
 
 //生成字幕图片
 - (UIImage*)textImage
@@ -179,6 +218,21 @@
     _borderView.layer.borderColor = UIColorFromRGB(0x0accac).CGColor;
 
     return rotatedImg;
+}
+
+//设置气泡
+- (void)setTextBubbleImage:(UIImage *)image textNormalizationFrame:(CGRect)frame
+{
+    _bubbleView.image = image;
+    if (image != nil) {
+        _textNormalizationFrame = frame;
+        [self calculateTextLabelFont];
+        _hasSetBubble = YES;
+    }else{
+        _hasSetBubble = NO;
+    }
+    self.transform = CGAffineTransformRotate(self.transform, -_rotateAngle);
+    _rotateAngle = 0;
 }
 
 //字幕图在视频预览view的frame
@@ -221,12 +275,7 @@
 - (void)changeFirstResponder
 {
     if (_isInputting) {
-        //辅助唤出键盘后，键盘上的输入框设为实际输入点
-        if ([_textLabel.text isEqualToString:kDefaultText]) {
-            _textLabel.text = @"";
-        } else {
-            _inputTextView.text = _textLabel.text;
-        }
+        _inputTextView.text = _textLabel.text;
         [_inputTextView becomeFirstResponder];
     } else {
         if (_hiddenTextField.isFirstResponder) {
@@ -237,7 +286,6 @@
         }
     }
 }
-
 
 #pragma mark - GestureRecognizer handle
 - (void)onTap:(UITapGestureRecognizer*)recognizer
@@ -252,7 +300,7 @@
     if (recognizer.view == self) {
         CGPoint translation = [recognizer translationInView:self.superview];
         CGPoint center = CGPointMake(recognizer.view.center.x + translation.x,
-                                             recognizer.view.center.y + translation.y);
+                                     recognizer.view.center.y + translation.y);
         if (center.x < 0) {
             center.x = 0;
         }
@@ -270,57 +318,59 @@
         recognizer.view.center = center;
         
         [recognizer setTranslation:CGPointZero inView:self.superview];
-
+        
         
     }
     else if (recognizer.view == _scaleRotateBtn) {
         CGPoint translation = [recognizer translationInView:self];
         
-        //放大
         if (recognizer.state == UIGestureRecognizerStateChanged) {
-            if (translation.y == 0.0 || fabs(translation.x / translation.y) > 3.0) {
-                CGFloat delta = translation.x / 3;
-                CGFloat newFontSize = MAX(10.0f, MIN(150.f, _textLabel.font.pointSize + delta));
-                
-                _textLabel.font = [UIFont systemFontOfSize:newFontSize];
+            //放大
+            CGFloat delta = translation.x / 10;
+            CGFloat newFontSize = MAX(10.0f, MIN(150.f, _textLabel.font.pointSize + delta));
+            _textLabel.font = [UIFont systemFontOfSize:newFontSize];
+            if (!_hasSetBubble) {
                 _textLabel.bounds = [self textRect];
                 self.bounds = CGRectMake(0, 0, _textLabel.bounds.size.width + 50, _textLabel.bounds.size.height + 40);
+            }else{
+                self.bounds = CGRectMake(0, 0, self.bounds.size.width + translation.x, self.bounds.size.height + translation.x);
             }
-            //旋转
-            else {
-                CGPoint newCenter = CGPointMake(recognizer.view.center.x + translation.x, recognizer.view.center.y + translation.y);
-                CGPoint anthorPoint = _textLabel.center;
-                CGFloat height = newCenter.y - anthorPoint.y;
-                CGFloat width = newCenter.x - anthorPoint.x;
-                CGFloat angle1 = atan(height / width);
-                height = recognizer.view.center.y - anthorPoint.y;
-                width = recognizer.view.center.x - anthorPoint.x;
-                CGFloat angle2 = atan(height / width);
-                CGFloat angle = angle1 - angle2;
-                
-                self.transform = CGAffineTransformRotate(self.transform, angle);
-                _rotateAngle += angle;
 
-            }
+            //旋转
+            CGPoint newCenter = CGPointMake(recognizer.view.center.x + translation.x, recognizer.view.center.y + translation.y);
+            CGPoint anthorPoint = _textLabel.center;
+            CGFloat height = newCenter.y - anthorPoint.y;
+            CGFloat width = newCenter.x - anthorPoint.x;
+            CGFloat angle1 = atan(height / width);
+            height = recognizer.view.center.y - anthorPoint.y;
+            width = recognizer.view.center.x - anthorPoint.x;
+            CGFloat angle2 = atan(height / width);
+            CGFloat angle = angle1 - angle2;
+            
+            self.transform = CGAffineTransformRotate(self.transform, angle);
+            _rotateAngle += angle;
         }
         [recognizer setTranslation:CGPointZero inView:self];
     }
-
+    
 }
 
 //双手指放大
 - (void)handlePinch:(UIPinchGestureRecognizer*)recognizer
 {
     CGFloat newFontSize = MAX(10.0f, MIN(150.f, _textLabel.font.pointSize * recognizer.scale));
-    
     // set font size
     _textLabel.font = [_textLabel.font fontWithSize:newFontSize];
-    
-    CGRect rect = [self textRect];
-    rect = [_textLabel convertRect:rect toView:self];
-
-    _textLabel.bounds = CGRectMake(0, 0, rect.size.width, rect.size.height);
-    self.bounds = CGRectMake(0, 0, _textLabel.bounds.size.width + 50, _textLabel.bounds.size.height + 40);
+    if (!_hasSetBubble) {
+        
+        CGRect rect = [self textRect];
+        rect = [_textLabel convertRect:rect toView:self];
+        
+        _textLabel.bounds = CGRectMake(0, 0, rect.size.width, rect.size.height);
+        self.bounds = CGRectMake(0, 0, _textLabel.bounds.size.width + 50, _textLabel.bounds.size.height + 40);
+    }else{
+        self.bounds = CGRectMake(0, 0, self.bounds.size.width * recognizer.scale, self.bounds.size.height * recognizer.scale);
+    }
 
     recognizer.scale = 1;
 }
@@ -343,11 +393,25 @@
     [_hiddenTextField resignFirstResponder];
     
     _textLabel.text = _inputTextView.text;
-    ;
-    _textLabel.bounds = [self textRect];
-    self.bounds = CGRectMake(0, 0, _textLabel.bounds.size.width + 50, _textLabel.bounds.size.height + 40);
+    
+    if (!_hasSetBubble) {
+        _textLabel.bounds = [self textRect];
+        self.bounds = CGRectMake(0, 0, _textLabel.bounds.size.width + 50, _textLabel.bounds.size.height + 40);
+    }else{
+        [self calculateTextLabelFont];
+    }
     
     [self.delegate onTextInputDone:_textLabel.text];
+}
+
+-(void)textViewDidChangeValue:(NSNotification *)obj{
+    UITextView *textView = (UITextView *)obj.object;
+    NSString *string = textView.text;
+    if(string.length > 0){
+        [_inputConfirmBtn setEnabled:YES];
+    }else{
+        [_inputConfirmBtn setEnabled:NO];
+    }
 }
 
 - (void)onDeleteBtnClicked:(UIButton*)sender
@@ -358,59 +422,7 @@
 
 - (void)onStyleBtnClicked:(UIButton*)sender
 {
-    //样式设计
-    _styleIndex = (_styleIndex + 1) % 9;
-    switch (_styleIndex) {
-        case 0: {
-            _textLabel.textColor = UIColor.whiteColor;
-            _textLabel.shadowColor = nil;
-            _borderView.backgroundColor = UIColor.clearColor;
-            break;
-        }
-        case 1: {
-            _borderView.backgroundColor = UIColor.blackColor;
-            break;
-        }
-        case 2: {
-            _textLabel.shadowColor = UIColor.brownColor;
-            _borderView.backgroundColor = UIColor.redColor;
-            break;
-        }
-        case 3: {
-            _textLabel.textColor = UIColor.blackColor;
-            _textLabel.shadowColor = nil;
-            _borderView.backgroundColor = UIColor.clearColor;
-            break;
-        }
-        case 4: {
-            _borderView.backgroundColor = UIColor.whiteColor;
-            break;
-        }
-        case 5: {
-            _textLabel.shadowColor = UIColor.brownColor;
-            _borderView.backgroundColor = UIColor.redColor;
-            break;
-        }
-        case 6: {
-            _textLabel.textColor = UIColor.redColor;
-            _textLabel.shadowColor = nil;
-            _borderView.backgroundColor = UIColor.clearColor;
-            break;
-        }
-        case 7: {
-            _borderView.backgroundColor = UIColor.whiteColor;
-            break;
-        }
-        case 8: {
-            _textLabel.shadowColor = UIColor.brownColor;
-            _borderView.backgroundColor = UIColor.blackColor;
-            break;
-        }
-            
-        default:
-            break;
-    }
-    
+    [self.delegate onBubbleTap];
 }
 
 - (void)dealloc

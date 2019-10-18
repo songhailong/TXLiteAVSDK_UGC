@@ -14,9 +14,9 @@
 #import <AVFoundation/AVFoundation.h>
 
 
-#define PIN_WIDTH 13
-#define THUMB_HEIGHT 60
-#define BORDER_HEIGHT 2
+#define PIN_WIDTH 13 * kScaleX
+#define THUMB_HEIGHT 60 * kScaleY
+#define BORDER_HEIGHT 2 * kScaleY
 
 @interface MusicMixView()<RangeContentDelegate, UICollectionViewDataSource, UICollectionViewDelegate>
 
@@ -229,23 +229,23 @@
     
     _selectView.frame = self.bounds;
     
-    _titleLabel.frame = CGRectMake(0, 0, self.width, 14);
-    _musicCollection.frame = CGRectMake(15 * kScaleX, _selectView.height - 202.5 * kScaleY, _selectView.width - 30 * kScaleX, 187.5 * kScaleY);
+    _titleLabel.frame = CGRectMake(0, 30, self.width, 14 * kScaleY);
+    _musicCollection.frame = CGRectMake(15 * kScaleX, _titleLabel.bottom + 10 * kScaleY, _selectView.width - 30 * kScaleX, 120 * kScaleY);
     
     
     _editView.frame = self.bounds;
     
     _musicIcon.frame = CGRectMake(15 * kScaleX, 0, _musicIcon.width, _musicIcon.height);
-    _songName.frame = CGRectMake(_musicIcon.right + 15 * kScaleX, 0, _editView.width / 2, 14);
+    _songName.frame = CGRectMake(_musicIcon.right + 15 * kScaleX, 0, _editView.width / 2, 14 *kScaleY);
     _deleteBtn.frame = CGRectMake(_editView.width - 15 * kScaleX - 50, 0, 40, _musicIcon.height);
     
-    _cutTitleLabel.frame = CGRectMake(15 * kScaleX, _musicIcon.bottom + 40 * kScaleY, _editView.width - 30 * kScaleX, 14);
+    _cutTitleLabel.frame = CGRectMake(15 * kScaleX, _musicIcon.bottom + 20 * kScaleY, _editView.width - 30 * kScaleX, 14 * kScaleY);
     _musicCutSlider.frame = CGRectMake((_editView.width - _musicCutSlider.width) / 2, _cutTitleLabel.bottom + 15 * kScaleY, _musicCutSlider.width, _musicCutSlider.height);
     
     _startTimeLabel.frame = CGRectMake(_musicCutSlider.x + _musicCutSlider.leftScale * _musicCutSlider.width + _musicCutSlider.leftPin.width / 2, _musicCutSlider.bottom + 5, 30, 10);
     _endTimeLabel.frame = CGRectMake(_musicCutSlider.x + _musicCutSlider.rightScale * _musicCutSlider.width - 30 + _musicCutSlider.rightPin.width / 2, _musicCutSlider.bottom + 5, 30, 10);
     
-    _volumeLabel.frame = CGRectMake(15 * kScaleX, _musicCutSlider.bottom + 70 * kScaleY, 0, 14);
+    _volumeLabel.frame = CGRectMake(15 * kScaleX, _musicCutSlider.bottom + 30 * kScaleY, 0, 14 * kScaleY);
     [_volumeLabel sizeToFit];
     
     
@@ -255,7 +255,7 @@
     _accompanyBtn.bounds = CGRectMake(0, 0, 20, 20);
     _accompanyBtn.center = CGPointMake(self.width - 15 * kScaleX - _accompanyBtn.width / 2, _micBtn.center.y);
     
-    _volumeSlider.bounds = CGRectMake(0, 0, _accompanyBtn.left - _micBtn.right - 24 * kScaleX, 20);
+    _volumeSlider.bounds = CGRectMake(0, 0, _accompanyBtn.left - _micBtn.right - 24 * kScaleX, 20 * kScaleY);
     _volumeSlider.center = CGPointMake(_micBtn.right + 12 * kScaleX + _volumeSlider.width / 2, _micBtn.center.y);
 }
 
@@ -419,7 +419,7 @@
 
 - (CGSize)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)collectionViewLayout sizeForItemAtIndexPath:(NSIndexPath *)indexPath
 {
-    return CGSizeMake(110, 90);
+    return CGSizeMake(110 * kScaleX, 90 * kScaleY);
 }
 
 //设置每个item水平间距

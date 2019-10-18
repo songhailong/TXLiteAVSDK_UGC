@@ -29,13 +29,21 @@
 #import <QCloudCore/QCloudCore.h>
 #import "QCloudCORSConfiguration.h"
 NS_ASSUME_NONNULL_BEGIN
+
+/**
+ Get Bucket CORS 接口实现 Bucket 持有者在 Bucket 上进行跨域资源共享的信息配置。（CORS 是一个 W3C 标准，全称是"跨域资源共享"（Cross-origin resource sharing））。默认情况下，Bucket 的持有者直接有权限使用该 API 接口，Bucket 持有者也可以将权限授予其他用户。
+ */
 @interface QCloudGetBucketCORSRequest : QCloudBizHTTPRequest
 /**
 存储桶名
 */
 @property (strong, nonatomic) NSString *bucket;
 
-
+/**
+ 请求完成后的会通过该block回调，返回结果，若error为空，即为成功。
+ 
+ @param QCloudRequestFinishBlock 回调bock
+ */
 - (void) setFinishBlock:(void (^)(QCloudCORSConfiguration* result, NSError * error))QCloudRequestFinishBlock;
 @end
 NS_ASSUME_NONNULL_END

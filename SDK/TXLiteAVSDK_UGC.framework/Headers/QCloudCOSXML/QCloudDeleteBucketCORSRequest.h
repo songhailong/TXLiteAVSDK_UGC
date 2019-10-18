@@ -28,6 +28,10 @@
 #import <Foundation/Foundation.h>
 #import <QCloudCore/QCloudCore.h>
 NS_ASSUME_NONNULL_BEGIN
+
+/**
+ Delete Bucket CORS 接口请求实现删除跨域访问配置信息。
+ */
 @interface QCloudDeleteBucketCORSRequest : QCloudBizHTTPRequest
 /**
 存储桶名

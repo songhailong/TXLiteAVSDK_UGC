@@ -30,6 +30,10 @@
 #import "QCloudDeleteResult.h"
 @class QCloudDeleteInfo;
 NS_ASSUME_NONNULL_BEGIN
+
+/**
+ Delete Multiple Object 接口请求实现在指定 Bucket 中批量删除 Object，单次请求最大支持批量删除 1000 个 Object。
+ */
 @interface QCloudDeleteMultipleObjectRequest : QCloudBizHTTPRequest
 /**
 存储桶名称
@@ -40,7 +44,11 @@ NS_ASSUME_NONNULL_BEGIN
 */
 @property (strong, nonatomic) QCloudDeleteInfo *deleteObjects;
 
-
+/**
+ 请求完成后的会通过该block回调，返回结果，若error为空，即为成功。
+ 
+ @param QCloudRequestFinishBlock 回调bock
+ */
 - (void) setFinishBlock:(void (^)(QCloudDeleteResult* result, NSError * error))QCloudRequestFinishBlock;
 @end
 NS_ASSUME_NONNULL_END

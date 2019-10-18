@@ -13,6 +13,7 @@
 #import "TXVideoCustomProcessDelegate.h"
 #import "TXLiveRecordTypeDef.h"
 #import "TXLiveRecordListener.h"
+#import "TXAudioRawDataDelegate.h"
 
 typedef NS_ENUM(NSInteger, TX_Enum_PlayType) {
     PLAY_TYPE_LIVE_RTMP = 0,          //RTMP直播
@@ -30,15 +31,14 @@ typedef NS_ENUM(NSInteger, TX_Enum_PlayType) {
 
 @property(nonatomic, weak) id <TXVideoCustomProcessDelegate> videoProcessDelegate;
 
+@property(nonatomic, weak) id <TXAudioRawDataDelegate> audioRawDataDelegate;
+
 @property(nonatomic, assign) BOOL enableHWAcceleration;
 
 @property(nonatomic, copy) TXLivePlayConfig *config;
 
 //短视频录制
 @property (nonatomic, weak)   id<TXLiveRecordListener>   recordDelegate;
-
-//短视频录制
-//@property (nonatomic, weak)   id<TXVideoRecordListener>   recordDelegate;
 
 @property BOOL isAutoPlay;  /// startPlay后是否立即播放，默认YES。点播有效
 

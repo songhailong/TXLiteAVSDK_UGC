@@ -1418,15 +1418,17 @@ static vm_size_t get_app_consumed_memory_bytes() {
 - (void)doChangeHD
 {
     TXLivePushConfig *configTmp = _txLivePublisher.config;
-    configTmp.videoEncodeGop = 5;
     if (_hd_level == HD_LEVEL_720P) {
         [_txLivePublisher setVideoQuality:VIDEO_QUALITY_SUPER_DEFINITION adjustBitrate:_autoBitrate adjustResolution:_autoResolution];
+        configTmp.videoEncodeGop = 5;
     }
     else if (_hd_level == HD_LEVEL_540P) {
         [_txLivePublisher setVideoQuality:VIDEO_QUALITY_HIGH_DEFINITION adjustBitrate:_autoBitrate adjustResolution:_autoResolution];
+        configTmp.videoEncodeGop = 5;
     }
     else if (_hd_level == HD_LEVEL_360P) {
         [_txLivePublisher setVideoQuality:VIDEO_QUALITY_STANDARD_DEFINITION adjustBitrate:_autoBitrate adjustResolution:_autoResolution];
+        configTmp.videoEncodeGop = 5;
     }
     else if (_hd_level == HD_LEVEL_LINKMIC_BIG) {
         [_txLivePublisher setVideoQuality:VIDEO_QUALITY_LINKMIC_MAIN_PUBLISHER adjustBitrate:_autoBitrate adjustResolution:_autoResolution];

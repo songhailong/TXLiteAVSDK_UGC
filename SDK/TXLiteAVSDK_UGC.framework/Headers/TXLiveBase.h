@@ -1,3 +1,4 @@
+#import "TXLiveAudioSessionDelegate.h"
 
 typedef NS_ENUM(NSInteger, TX_Enum_Type_LogLevel) {
     LOGLEVEL_VERBOSE = 0,   //输出所有级别的log
@@ -46,6 +47,8 @@ typedef NS_ENUM(NSInteger, TX_Enum_Type_LogLevel) {
 
 
 + (void) setAppVersion:(NSString *)verNum;
+
++ (void)setAudioSessionDelegate:(id<TXLiveAudioSessionDelegate>)delegate;
 
 /* getSDKVersionStr 获取SDK版本信息
  */

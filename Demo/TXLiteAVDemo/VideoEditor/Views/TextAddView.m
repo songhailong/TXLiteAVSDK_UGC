@@ -27,7 +27,7 @@
         _textAddButton = [UIButton new];
         [_textAddButton setImage:[UIImage imageNamed:@"text_add"] forState:UIControlStateNormal];
         _textAddButton.backgroundColor = UIColorFromRGB(0x181818);
-        [_textAddButton setTitle:@"添加文字" forState:UIControlStateNormal];
+        [_textAddButton setTitle:@"添加普通字幕/气泡字幕" forState:UIControlStateNormal];
         _textAddButton.titleLabel.font = [UIFont systemFontOfSize:16];
         _textAddButton.titleEdgeInsets = UIEdgeInsetsMake(0, 10, 0, 0);
         [_textAddButton addTarget:self action:@selector(onTextAddBtnClicked:) forControlEvents:UIControlEventTouchUpInside];
@@ -54,11 +54,11 @@
 {
     if (!isEdited) {
         [_textAddButton setImage:[UIImage imageNamed:@"text_add"] forState:UIControlStateNormal];
-        [_textAddButton setTitle:@"添加文字" forState:UIControlStateNormal];
+        [_textAddButton setTitle:@"添加普通字幕/气泡字幕" forState:UIControlStateNormal];
     }
     else {
         [_textAddButton setImage:[UIImage imageNamed:@"type"] forState:UIControlStateNormal];
-        [_textAddButton setTitle:@"编辑文字" forState:UIControlStateNormal];
+        [_textAddButton setTitle:@"编辑普通字幕/气泡字幕" forState:UIControlStateNormal];
     }
 }
 

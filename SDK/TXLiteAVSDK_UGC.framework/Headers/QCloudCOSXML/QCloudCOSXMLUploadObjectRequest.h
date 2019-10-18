@@ -16,6 +16,12 @@ typedef NSData* QCloudCOSXMLUploadObjectResumeData;
 @class QCloudInitiateMultipartUploadResult;
 @class QCloudCOSXMLUploadObjectRequest;
 typedef void(^InitMultipleUploadFinishBlock)(QCloudInitiateMultipartUploadResult* multipleUploadInitResult, QCloudCOSXMLUploadObjectResumeData resumeData);
+
+/**
+ COSXML上传对象接口。在上传小于1MB的文件时，通过该request来上传的话，会生成一个简单上传putObjectRequset，将整个对象直接上传。
+ 
+ 如果上传的对象大小大于1MB时，我们会在内部进行分片上传的处理，将文件切分成数个1MB大小的块，然后通过并行分快上传的方式进行上传。
+ */
 @interface QCloudCOSXMLUploadObjectRequest<BodyType> : QCloudAbstractRequest
 /**
  上传文件（对象）的文件名，也是对象的key，请注意文件名中不可以含有问号即"?"字符
@@ -30,7 +36,12 @@ typedef void(^InitMultipleUploadFinishBlock)(QCloudInitiateMultipartUploadResult
 
 
 /**
- 需要上传的文件的路径。填入NSURL*类型变量
+ 在进行HTTP请求的时候，您可以通过设置该参数来设置自定义的一些头部信息。
+ 
+ */
+@property (strong, nonatomic) NSDictionary* customHeaders;
+/**
+ 需要上传的对象内容。可以传入NSData*或者NSURL*类型的变量
  */
 @property (strong, nonatomic) BodyType body;
 
@@ -103,10 +114,14 @@ typedef void(^InitMultipleUploadFinishBlock)(QCloudInitiateMultipartUploadResult
  */
 @property (nonatomic, copy) InitMultipleUploadFinishBlock initMultipleUploadFinishBlock;
 
-- (void) setFinishBlock:(void (^)(QCloudUploadObjectResult* result, NSError *))QCloudRequestFinishBlock;
+/**
+ 上传完成后会通过该block回调。若error为空，可视为成功。
+
+ @param QCloudRequestFinishBlock 上传完成后的回调
+ */
+- (void) setFinishBlock:(void (^)(QCloudUploadObjectResult* result, NSError* error))QCloudRequestFinishBlock;
 #pragma resume
 + (instancetype) requestWithRequestData:(QCloudCOSXMLUploadObjectResumeData)resumeData;
-
 - (QCloudCOSXMLUploadObjectResumeData) cancelByProductingResumeData:(NSError* __autoreleasing*)error;
 
 
