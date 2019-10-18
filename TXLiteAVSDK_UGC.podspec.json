@@ -1,6 +1,6 @@
 {
   "name": "TXLiteAVSDK_UGC",
-  "version": "4.1.3163",
+  "version": "4.2.3427",
   "platforms": {
     "ios": "8.0"
   },
@@ -31,7 +31,7 @@
   },
   "requires_arc": true,
   "source": {
-    "http": "http://liteavsdk-1252463788.cosgz.myqcloud.com/4.1/TXLiteAVSDK_UGC_Rename_iOS_4.1.3163.zip?_ga=1.208149712.397469753.1493197281"
+    "http": "https://liteavsdk-1252463788.cosgz.myqcloud.com/4.2/TXLiteAVSDK_UGC_Rename_iOS_4.2.3427.zip"
   },
   "preserve_paths": "TXLiteAVSDK_UGC/SDK/TXLiteAVSDK_UGC.framework",
   "source_files": "TXLiteAVSDK_UGC/SDK/TXLiteAVSDK_UGC.framework/Headers/*.h",
