@@ -12,6 +12,6 @@
 @interface LiveRoomNewViewController : UIViewController
 
 @property (nonatomic, weak)    LiveRoom*         liveRoom;
-@property (nonatomic, copy)    NSString*         nickName;
+@property (nonatomic, copy)    NSString*         userName;
 
 @end

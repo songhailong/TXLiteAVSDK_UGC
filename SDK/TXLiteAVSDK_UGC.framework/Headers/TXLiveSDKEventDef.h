@@ -16,6 +16,7 @@ enum EventID
              PUSH_EVT_ROOM_IN                 =  1018,   // 已经在webrtc房间里面，进房成功后通知
              PUSH_EVT_ROOM_OUT                =  1019,   // 不在webrtc房间里面，进房失败或者中途退出房间时通知
              PUSH_EVT_ROOM_USERLIST           =  1020,   // 下发webrtc房间成员列表(不包括自己)
+             PUSH_EVT_ROOM_NEED_REENTER       =  1021,   // WiFi切换到4G会触发断线重连，此时需要重新进入webrtc房间(拉取最优的服务器地址)
 
 	/*step1*/    PUSH_ERR_OPEN_CAMERA_FAIL        = -1301,   // 打开摄像头失败
 /*step1*/    PUSH_ERR_OPEN_MIC_FAIL           = -1302,   // 打开麦克风失败

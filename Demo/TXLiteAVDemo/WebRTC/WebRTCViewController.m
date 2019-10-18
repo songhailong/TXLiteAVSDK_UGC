@@ -278,6 +278,9 @@
         config.videoBitrateMax = 400;
         [_livePusher setConfig:config];
         
+        // 设置是否静音(上次推流的设置)
+        [_livePusher setMute:_mute_switch];
+        
         _livePusher.delegate = self;
         [_livePusher startPreview:_pusherView];
         
@@ -305,6 +308,7 @@
         [player stopPlay];
     }
     [_livePlayerDic removeAllObjects];
+    [_playerViewDic removeAllObjects];
     [_playerEventDic removeAllObjects];
     
     [_userListArray removeAllObjects];
@@ -357,7 +361,7 @@
                             _sdkappid, _roomID, _userID, roomSig];
                 _pushUrl = [strUrl stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
                 
-                [self appendLog:[NSString stringWithFormat:@"推流地址: %@", _pushUrl]];
+                //[self appendLog:[NSString stringWithFormat:@"推流地址: %@", _pushUrl]];
                 
                 // 开始上行推流
                 if (![self start]) {
@@ -368,6 +372,9 @@
                 [_btnJoin setImage:[UIImage imageNamed:@"suspend"] forState:UIControlStateNormal];
                 _join_switch = YES;
                 [[UIApplication sharedApplication] setIdleTimerDisabled:YES];
+                
+            } else {
+                [self appendLog:@"获取RoomSig失败!"];
             }
         }];
     }
@@ -474,6 +481,12 @@
             [self appendLog:msg];
             // 关闭推流
             [self clickjoin:_btnJoin];
+            
+        } else if (EvtID == PUSH_EVT_ROOM_NEED_REENTER) {
+            // 需要重新进入房间，原因是网络发生切换，需要重新拉取最优的服务器地址
+            [self appendLog:msg];
+            [self clickjoin:_btnJoin];  // stop
+            [self clickjoin:_btnJoin];  // start
         }
     });
 }
@@ -697,19 +710,10 @@
 // 登录客户自己的服务器，拿到userSig，用于获取roomSig
 typedef void (^ILoginAppCompletion)(NSString *userSig);
 - (void)loginAppServer:(NSString *)userID pwd:(NSString *)pwd sdkappid:(uint32_t)sdkappid withCompletion:(ILoginAppCompletion)completion {
-    AFHTTPSessionManager *_httpSession;
-    _httpSession = [AFHTTPSessionManager manager];
-    [_httpSession setRequestSerializer:[AFJSONRequestSerializer serializer]];
-    [_httpSession setResponseSerializer:[AFJSONResponseSerializer serializer]];
-    [_httpSession.requestSerializer willChangeValueForKey:@"timeoutInterval"];
-    _httpSession.requestSerializer.timeoutInterval = 5.0;
-    [_httpSession.requestSerializer didChangeValueForKey:@"timeoutInterval"];
-    _httpSession.responseSerializer.acceptableContentTypes = [NSSet setWithObjects:@"application/json", @"text/json", @"text/javascript", @"text/html", @"text/xml", @"text/plain", nil];
-    
     NSDictionary *reqParam = @{@"id": userID, @"pwd": pwd, @"appid": @(sdkappid)};
     NSString *reqUrl = @"https://sxb.qcloud.com/sxb_dev/?svc=account&cmd=login";
     
-    [_httpSession POST:reqUrl parameters:reqParam progress:nil success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
+    [self POST:reqUrl parameters:reqParam retryCount:0 retryLimit:5 progress:nil success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
         dispatch_async(dispatch_get_main_queue(), ^{
             id data = responseObject[@"data"];
             id userSig = data[@"userSig"];
@@ -734,16 +738,6 @@ typedef void (^ILoginAppCompletion)(NSString *userSig);
 // 请求腾讯云签名服务器，拿到roomSig，用来进入WebRTC房间
 typedef void (^IRequestSigCompletion)(NSString *roomSig);
 - (void)requestSigServer:(NSString *)userID userSig:(NSString *)userSig roomID:(uint32_t)roomID sdkappid:(uint32_t)sdkappid withCompletion:(IRequestSigCompletion)completion {
-    AFHTTPSessionManager *_httpSession;
-    _httpSession = [AFHTTPSessionManager manager];
-    [_httpSession setRequestSerializer:[AFJSONRequestSerializer serializer]];
-    [_httpSession setResponseSerializer:[AFJSONResponseSerializer serializer]];
-    [_httpSession.requestSerializer willChangeValueForKey:@"timeoutInterval"];
-    _httpSession.requestSerializer.timeoutInterval = 5.0;
-    [_httpSession.requestSerializer didChangeValueForKey:@"timeoutInterval"];
-    _httpSession.responseSerializer.acceptableContentTypes = [NSSet setWithObjects:@"application/json", @"text/json", @"text/javascript", @"text/html", @"text/xml", @"text/plain", nil];
-    
-    
     NSDictionary *reqHead = @{@"Cmd": @(1), @"SeqNo": @(1), @"BusType": @(7), @"GroupId": @(roomID)};
     NSDictionary *reqBody = @{@"PrivMap": @(255), @"IsIpRedirect": @(0), @"TerminalType": @(1), @"FromType": @(3), @"SdkVersion": @(26280566)};
     
@@ -758,7 +752,7 @@ typedef void (^IRequestSigCompletion)(NSString *roomSig);
         reqUrl = [NSString stringWithFormat:@"https://test.tim.qq.com/v4/openim/jsonvideoapp?sdkappid=%u&identifier=%@&usersig=%@&random=9999&contenttype=json", sdkappid, userID, userSig];
     }
     
-    [_httpSession POST:reqUrl parameters:reqParam progress:nil success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
+    [self POST:reqUrl parameters:reqParam retryCount:0 retryLimit:5 progress:nil success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
         dispatch_async(dispatch_get_main_queue(), ^{
             id rspHead = responseObject[@"RspHead"];
             id rspBody = responseObject[@"RspBody"];
@@ -808,6 +802,42 @@ typedef void (^IGetRoomSigCompletion)(NSString *roomSig);
         } else if (completion) {
             completion(nil);
         }
+    }];
+}
+
+// 网络请求包装，每次请求重试若干次
+- (void)POST:(NSString *)URLString
+                parameters:(id)parameters
+                 retryCount:(NSInteger)retryCount
+                 retryLimit:(NSInteger)retryLimit
+                  progress:(void (^)(NSProgress * _Nonnull))uploadProgress
+                   success:(void (^)(NSURLSessionDataTask * _Nonnull, id _Nullable))success
+                   failure:(void (^)(NSURLSessionDataTask * _Nullable, NSError * _Nonnull))failure {
+    
+    AFHTTPSessionManager *_httpSession;
+    _httpSession = [AFHTTPSessionManager manager];
+    [_httpSession setRequestSerializer:[AFJSONRequestSerializer serializer]];
+    [_httpSession setResponseSerializer:[AFJSONResponseSerializer serializer]];
+    [_httpSession.requestSerializer willChangeValueForKey:@"timeoutInterval"];
+    _httpSession.requestSerializer.timeoutInterval = 5.0;
+    [_httpSession.requestSerializer didChangeValueForKey:@"timeoutInterval"];
+    _httpSession.responseSerializer.acceptableContentTypes = [NSSet setWithObjects:@"application/json", @"text/json", @"text/javascript", @"text/html", @"text/xml", @"text/plain", nil];
+    
+    [_httpSession POST:URLString parameters:parameters progress:uploadProgress success:success failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
+        if (retryCount < retryLimit) {
+            // 1秒后重试
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                [self appendLog:@"https request retry"];
+                [self POST:URLString parameters:parameters retryCount:retryCount+1 retryLimit:retryLimit progress:uploadProgress success:success failure:failure];
+            });
+        } else {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (failure) {
+                    failure(task, error);
+                }
+            });
+        }
+        
     }];
 }
 

@@ -83,7 +83,7 @@
     _memberNumLeftLabel.frame = CGRectMake(20, 80, 200, 20);
     _memberNumRightLabel.frame = CGRectMake(120, 80, 200, 20);
     
-    _roomNameRightLabel.text = _roomName;
+    _roomNameRightLabel.text = _roomInfo;
     _roomIDRightLabel.text = _roomID;
     _memberNumRightLabel.text = [NSString stringWithFormat:@"%d人", (int)_memberNum];
 }

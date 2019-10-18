@@ -313,7 +313,6 @@ ScanQRDelegate
     _loadingImageView.animationImages = array;
     _loadingImageView.animationDuration = 1;
     _loadingImageView.hidden = YES;
-    [self.view addSubview:_loadingImageView];
     
     _vCacheStrategy = [[UIView alloc]init];
     _vCacheStrategy.frame = CGRectMake(0, size.height-120, size.width, 120);
@@ -351,10 +350,10 @@ ScanQRDelegate
     [self.view addSubview:_vCacheStrategy];
     
     CGRect VideoFrame = self.view.bounds;
-    mVideoContainer = [[UIView alloc] initWithFrame:CGRectMake(0, 0, VideoFrame.size.width, VideoFrame.size.height)];
+    mVideoContainer = [[UIView alloc] initWithFrame:CGRectMake(VideoFrame.size.width, 0, VideoFrame.size.width, VideoFrame.size.height)];
     [self.view insertSubview:mVideoContainer atIndex:0];
     mVideoContainer.center = self.view.center;
-    
+//    mVideoContainer.backgroundColor = UIColor.lightTextColor;
     if (self.isLivePlay) {
         self.title = @"直播播放器";
         if (self.isRealtime) {
@@ -503,8 +502,10 @@ ScanQRDelegate
             } else if (self.isRealtime) {
                 [self toastTip:@"播放地址非合法的低延时播放地址!"];
             }
-        } else if (([playUrl hasPrefix:@"https:"] || [playUrl hasPrefix:@"http:"]) && [playUrl rangeOfString:@".flv"].length > 0) {
+        } else if (([playUrl hasPrefix:@"https:"] || [playUrl hasPrefix:@"http:"]) && ([playUrl rangeOfString:@".flv"].length > 0)) {
             _playType = PLAY_TYPE_LIVE_FLV;
+        } else if (([playUrl hasPrefix:@"https:"] || [playUrl hasPrefix:@"http:"]) && [playUrl rangeOfString:@".m3u8"].length > 0) {
+            _playType = PLAY_TYPE_VOD_HLS;
         } else{
             [self toastTip:@"播放地址不合法，直播目前仅支持rtmp,flv播放方式!"];
             return NO;
@@ -530,6 +531,9 @@ ScanQRDelegate
     return YES;
 }
 -(BOOL)startRtmp{
+    CGRect frame = CGRectMake(self.view.bounds.size.width, 0, self.view.bounds.size.width, self.view.bounds.size.height);
+    mVideoContainer.frame = frame;
+    [_loadingImageView removeFromSuperview];
     NSString* playUrl = self.txtRtmpUrl.text;
     if (playUrl.length == 0) {
         playUrl = @"http://baobab.wdjcdn.com/1456117847747a_x264.mp4";
@@ -576,7 +580,7 @@ ScanQRDelegate
             _config.cacheFolderPath = nil;
         }
         _config.playerPixelFormatType = kCVPixelFormatType_420YpCbCr8BiPlanarFullRange;
-        _config.headers = @{@"Referer": @"qcloud.com"};
+//        _config.headers = @{@"Referer": @"qcloud.com"};
         [_txLivePlayer setConfig:_config];
         
         //设置播放器缓存策略
@@ -593,6 +597,15 @@ ScanQRDelegate
 //        int result = [_txLivePlayer startPlay:[MyURL relativePath] type:PLAY_TYPE_LOCAL_VIDEO];
         int result = [_txLivePlayer startPlay:playUrl type:_playType];
         [_txLivePlayer showVideoDebugLog:_log_switch];
+//        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            CGRect frame = CGRectMake(0, 0, self.view.bounds.size.width, self.view.bounds.size.height);
+            [UIView animateWithDuration:0.4 animations:^{
+                mVideoContainer.frame = frame;
+            } completion:^(BOOL finished) {
+                [self.view addSubview:_loadingImageView];
+            }];
+//        });
+
 
         if( result != 0)
         {
@@ -1179,8 +1192,6 @@ ScanQRDelegate
         
         if (EvtID == PLAY_EVT_RCV_FIRST_I_FRAME) {
 //            _publishParam = nil;
-            if (!self.isLivePlay)
-                [_txLivePlayer setupVideoWidget:CGRectMake(0, 0, 0, 0) containView:mVideoContainer insertIndex:0];
         }
         
         if (EvtID == PLAY_EVT_PLAY_BEGIN) {

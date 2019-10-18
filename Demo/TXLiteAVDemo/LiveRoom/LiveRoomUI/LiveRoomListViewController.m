@@ -15,8 +15,8 @@
 #import "LiveRoomTableViewCell.h"
 #import "LiveRoomNewViewController.h"
 
-#define kHttpServerAddrDomain           @"https://lvb.qcloud.com/weapp/live_room"
-#define kHttpServerAddr_GetIMLoginInfo  kHttpServerAddrDomain@"/get_im_login_info"
+#define kHttpServerAddrDomain           @"https://room.qcloud.com/weapp/live_room"
+#define kHttpServerAddr_GetLoginInfo    @"https://room.qcloud.com/weapp/utils/get_login_info"
 
 @interface LiveRoomListViewController () <UITableViewDelegate, UITableViewDataSource, LiveRoomListener> {
     NSArray<RoomInfo *>  	 *_roomInfoArray;
@@ -31,8 +31,8 @@
     BOOL                     _log_switch;
     UIView                   *_coverView;
     
-    NSArray<NSString*>       *_nickNameArray;
-    NSString                 *_nickName;
+    NSArray<NSString*>       *_userNameArray;
+    NSString                 *_userName;
 }
 
 @property (nonatomic, strong) LiveRoom *liveRoom;
@@ -49,13 +49,15 @@
     _liveRoom.delegate = self;
     
     _roomInfoArray = [[NSArray alloc] init];
-    _nickNameArray = [[NSArray alloc] initWithObjects:@"李元芳", @"刘备", @"梦奇", @"王昭君", @"周瑜", @"鲁班", @"后裔", @"安其拉", @"亚瑟", @"曹操",
+    _userNameArray = [[NSArray alloc] initWithObjects:@"李元芳", @"刘备", @"梦奇", @"王昭君", @"周瑜", @"鲁班", @"后裔", @"安其拉", @"亚瑟", @"曹操",
                       @"百里守约", @"东皇太一", @"花木兰", @"诸葛亮", @"黄忠", @"不知火舞", @"钟馗", @"李白", @"娜可露露", @"张飞", nil];
-    _nickName = _nickNameArray[arc4random() % _nickNameArray.count];
+    _userName = _userNameArray[arc4random() % _userNameArray.count];
     
     _initSucc = NO;
     
     [self initUI];
+    
+    NSString * userID = [NSString stringWithFormat:@"userID_%ld_%u", (long)[[NSDate date] timeIntervalSince1970] * 1000, arc4random()];
     
     // 从后台获取随机产生的userID，以及IMSDK所需要的appid、account_type, sig等信息
     AFHTTPSessionManager *httpSession = [AFHTTPSessionManager manager];
@@ -68,27 +70,30 @@
     
     
     __weak __typeof(self) weakSelf = self;
-    NSDictionary *param = @{@"userIDPrefix":@"iOS"};
-    [httpSession POST:kHttpServerAddr_GetIMLoginInfo parameters:param progress:nil success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
+    NSString * strCgiUrl = [NSString stringWithFormat:@"%@?userID=%@", kHttpServerAddr_GetLoginInfo, userID];
+    [httpSession GET:strCgiUrl parameters:nil progress:nil success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
         int errCode = [responseObject[@"code"] intValue];
         NSString *errMsg = responseObject[@"message"];
+        NSNumber * sdkAppID = responseObject[@"sdkAppID"];
+        NSString * userSig = responseObject[@"userSig"];
+        NSString * accType = responseObject[@"accType"];
         if (errCode != 0) {
-            NSLog(@"request IM login info failed: errCode[%d] errMsg[%@]", errCode, errMsg);
-            [weakSelf alertTips:@"get_im_login_info请求失败" msg:errMsg];
+            NSLog(@"request login info failed: errCode[%d] errMsg[%@]", errCode, errMsg);
+            [weakSelf alertTips:@"获取登录信息失败" msg:errMsg];
             return;
         }
-        
-        SelfAccountInfo *userInfo = [[SelfAccountInfo alloc] init];
-        userInfo.userID = responseObject[@"userID"];
-        userInfo.appID = [responseObject[@"sdkAppID"] intValue];
-        userInfo.accountType = responseObject[@"accType"];
-        userInfo.userSig = responseObject[@"userSig"];
-        userInfo.nickName = _nickName;
-        userInfo.headPicUrl = @"headpic.png";
+
+        LoginInfo *loginInfo = [LoginInfo new];
+        loginInfo.sdkAppID = [sdkAppID intValue];
+        loginInfo.userID = userID;
+        loginInfo.userName = _userName;
+        loginInfo.userAvatar = @"headpic.png";
+        loginInfo.userSig = userSig;
+        loginInfo.accType = accType;
         
         // 初始化LiveRoom
-        [weakSelf.liveRoom init:kHttpServerAddrDomain accountInfo:userInfo withCompletion:^(int errCode, NSString *errMsg) {
-            NSLog(@"initIM errCode[%d] errMsg[%@]", errCode, errMsg);
+        [weakSelf.liveRoom login:kHttpServerAddrDomain loginInfo:loginInfo withCompletion:^(int errCode, NSString *errMsg) {
+            NSLog(@"init LiveRoom errCode[%d] errMsg[%@]", errCode, errMsg);
             if (errCode == 0) {
                 weakSelf.initSucc = YES;
             } else {
@@ -97,7 +102,7 @@
         }];
         
     } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
-        NSLog(@"request IM login info failed: err[%@]", [error description]);
+        NSLog(@"request login info failed: err[%@]", [error description]);
         [weakSelf alertTips:@"提示" msg:@"网络请求超时，请检查网络设置"];
     }];
 }
@@ -246,7 +251,7 @@
     
     LiveRoomNewViewController *newRoomController = [[LiveRoomNewViewController alloc] init];
     newRoomController.liveRoom = _liveRoom;
-    newRoomController.nickName = _nickName;
+    newRoomController.userName = _userName;
     [self.navigationController pushViewController:newRoomController animated:YES];
 }
 
@@ -349,9 +354,11 @@
     //cell.detailTextLabel.text = [NSString stringWithFormat:@"%lu人在线", roomInfo.memberInfos.count];
     //cell.detailTextLabel.textColor = [UIColor colorWithWhite:0.52 alpha:1.0];
     
-    cell.roomName = roomInfo.roomName;
+    int memberNum = [roomInfo.audienceInfoArray count];
+    
+    cell.roomInfo = roomInfo.roomInfo;
     cell.roomID = roomInfo.roomID;
-    cell.memberNum = [roomInfo.pusherInfoArray count];
+    cell.memberNum = memberNum == 0 ? 1 : memberNum;
     
     return cell;
 }
@@ -366,7 +373,7 @@
     LiveRoomPlayerViewController *vc = [[LiveRoomPlayerViewController alloc] init];
     vc.roomID = roomInfo.roomID;
     vc.roomName = roomInfo.roomName;
-    vc.nickName = _nickName;
+    vc.userName = _userName;
     vc.liveRoom = _liveRoom;
     _liveRoom.delegate = vc;
     

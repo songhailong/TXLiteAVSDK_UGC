@@ -10,7 +10,7 @@
 
 @interface LiveRoomTableViewCell : UITableViewCell
 
-@property (nonatomic, copy)   NSString   *roomName;
+@property (nonatomic, copy)   NSString   *roomInfo;
 @property (nonatomic, copy)   NSString   *roomID;
 @property (nonatomic, assign) NSInteger  memberNum;
 

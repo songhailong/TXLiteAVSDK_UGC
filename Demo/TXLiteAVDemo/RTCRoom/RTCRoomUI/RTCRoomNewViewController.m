@@ -85,7 +85,7 @@
         vc.entryType = 1;
         vc.roomName = roomName;
         vc.roomID = @"";
-        vc.nickName = _nickName;
+        vc.userName = _userName;
         vc.rtcRoom = _rtcRoom;
         _rtcRoom.delegate = vc;
         [self.navigationController pushViewController:vc animated:YES];
@@ -95,7 +95,7 @@
         vc.entryType = 1;
         vc.roomName = roomName;
         vc.roomID = @"";
-        vc.nickName = _nickName;
+        vc.userName = _userName;
         vc.rtcRoom = _rtcRoom;
         _rtcRoom.delegate = vc;
         [self.navigationController pushViewController:vc animated:YES];

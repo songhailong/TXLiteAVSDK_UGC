@@ -21,6 +21,9 @@
 
 @property(nonatomic, weak) id <TXVodPlayListener> vodDelegate;
 
+/**
+ * 视频渲染回调。（仅硬解支持）
+ */
 @property(nonatomic, weak) id <TXVideoCustomProcessDelegate> videoProcessDelegate;
 
 @property(nonatomic, assign) BOOL enableHWAcceleration;

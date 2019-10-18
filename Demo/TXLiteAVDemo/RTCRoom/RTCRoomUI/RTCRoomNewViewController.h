@@ -12,7 +12,7 @@
 @interface RTCRoomNewViewController : UIViewController
 
 @property (nonatomic, weak)    RTCRoom*          rtcRoom;
-@property (nonatomic, copy)    NSString*         nickName;
+@property (nonatomic, copy)    NSString*         userName;
 @property (nonatomic, assign)  NSInteger         roomType;  // 1表示双人房间，2表示多人房间
 
 @end

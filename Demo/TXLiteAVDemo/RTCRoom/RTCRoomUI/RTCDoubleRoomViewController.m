@@ -20,7 +20,7 @@
     NSMutableDictionary      *_playerViewDic;      // [userID, view]
     NSMutableDictionary      *_playerInfoDic;      // [userID, MemberInfo]
     NSMutableArray           *_placeViewArray;     // 用来界面显示占位,view
-    NSMutableArray           *_nickNameLabelArray; // 用来显示昵称,UILabel，放在对应的视频view上面
+    NSMutableArray           *_userNameLabelArray; // 用来显示昵称,UILabel，放在对应的视频view上面
     
     UIButton                 *_btnCamera;
     UIButton                 *_btnBeauty;
@@ -55,7 +55,7 @@
     _playerViewDic = [[NSMutableDictionary alloc] init];
     _playerInfoDic = [[NSMutableDictionary alloc] init];
     _placeViewArray = [[NSMutableArray alloc] init];
-    _nickNameLabelArray = [[NSMutableArray alloc] init];
+    _userNameLabelArray = [[NSMutableArray alloc] init];
     
     _appIsInterrupt = NO;
     _appIsInActive = NO;
@@ -82,6 +82,8 @@
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onAppDidBecomeActive:) name:UIApplicationDidBecomeActiveNotification object:nil];
     
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardFrameDidChange:) name:UIKeyboardWillChangeFrameNotification object:nil];
+    [[UIApplication sharedApplication] setIdleTimerDisabled:YES];
+
 }
 
 - (void)viewWillDisappear:(BOOL)animated {
@@ -101,6 +103,8 @@
     }
     
     [[NSNotificationCenter defaultCenter] removeObserver:self];
+    [[UIApplication sharedApplication] setIdleTimerDisabled:NO];
+
 }
 
 // 跳转到列表页
@@ -215,10 +219,8 @@
     [self.view insertSubview:_pusherView atIndex:0];
     [_rtcRoom startLocalPreview:_pusherView];
     
-    
     // 设置分辨率和码率, 使用3:4比例，音频使用48K采样率
     [_rtcRoom setBitrateRange:400 max:800];
-    [_rtcRoom setVideoRatio:ROOM_VIDEO_RATIO_3_4];
     [_rtcRoom setHDAudio:YES];
     
     // 设置默认美颜
@@ -248,10 +250,10 @@
     int originY = videoRectScope.origin.y + row * (offsetY + videoViewHeight);
     
     // 重置昵称布局
-    for (UILabel *label in _nickNameLabelArray) {
+    for (UILabel *label in _userNameLabelArray) {
         [label removeFromSuperview];
     }
-    [_nickNameLabelArray removeAllObjects];
+    [_userNameLabelArray removeAllObjects];
     
     // 先设置本地预览
     _pusherView.frame = CGRectMake(originX, originY, videoViewWidth, videoViewHeight);
@@ -261,14 +263,14 @@
     [nickBackImg setBackgroundImage:[UIImage imageNamed:@"nick_mask"]];
     
     UILabel *label = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, nickBackImg.width, nickBackImg.height)];
-    label.text = _nickName;
+    label.text = _userName;
     label.textColor = [UIColor whiteColor];
     label.textAlignment = NSTextAlignmentLeft;
     label.font = [UIFont systemFontOfSize:12];
     [nickBackImg addSubview:label];
     
     [_pusherView addSubview:nickBackImg];
-    [_nickNameLabelArray addObject:nickBackImg];
+    [_userNameLabelArray addObject:nickBackImg];
     
     
     // 设置其他remoteView
@@ -289,14 +291,14 @@
         [nickBackImg setBackgroundImage:[UIImage imageNamed:@"nick_mask"]];
         
         UILabel *label = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, nickBackImg.width, nickBackImg.height)];
-        label.text = info.nickName;
+        label.text = info.userName;
         label.textColor = [UIColor whiteColor];
         label.textAlignment = NSTextAlignmentLeft;
         label.font = [UIFont systemFontOfSize:12];
         [nickBackImg addSubview:label];
         
         [playerView addSubview:nickBackImg];
-        [_nickNameLabelArray addObject:nickBackImg];
+        [_userNameLabelArray addObject:nickBackImg];
         
         if (index >= rowNum * colNum) {
             break;
@@ -353,7 +355,7 @@
 
 - (void)initRoomLogic {
     if (_entryType == 1) {  // 房间创建者
-        [_rtcRoom createRoom:_roomName withCompletion:^(int errCode, NSString *errMsg) {
+        [_rtcRoom createRoom:@"" roomInfo:_roomName withCompletion:^(int errCode, NSString *errMsg) {
             NSLog(@"createRoom: errCode[%d] errMsg[%@]", errCode, errMsg);
             dispatch_async(dispatch_get_main_queue(), ^{
                 if (errCode == 0) {
@@ -496,12 +498,14 @@
             [_playerViewDic setObject:playerView forKey:pusherInfo.userID];
             [_playerInfoDic setObject:pusherInfo forKey:pusherInfo.userID];
             
-            [_rtcRoom addRemoteView:playerView withUserID:pusherInfo.userID];
+            [_rtcRoom addRemoteView:playerView withUserID:pusherInfo.userID playBegin:nil playError:^(int errCode, NSString *errMsg) {
+                [self onPusherQuit:pusherInfo];
+            }];
             
             [self relayout];
             
             //LOG
-            [self appendLog:[NSString stringWithFormat:@"播放: userID[%@] nickName[%@] playUrl[%@]", pusherInfo.userID, pusherInfo.nickName, pusherInfo.playUrl]];
+            [self appendLog:[NSString stringWithFormat:@"播放: userID[%@] userName[%@] playUrl[%@]", pusherInfo.userID, pusherInfo.userName, pusherInfo.playUrl]];
         }
     });
 }
@@ -515,7 +519,9 @@
         [_playerViewDic setObject:playerView forKey:pusherInfo.userID];
         [_playerInfoDic setObject:pusherInfo forKey:pusherInfo.userID];
         
-        [_rtcRoom addRemoteView:playerView withUserID:pusherInfo.userID];
+        [_rtcRoom addRemoteView:playerView withUserID:pusherInfo.userID playBegin:nil playError:^(int errCode, NSString *errMsg) {
+            [self onPusherQuit:pusherInfo];
+        }];
         
         [self relayout];
     });
@@ -550,11 +556,11 @@
     }];
 }
 
-- (void)onRecvRoomTextMsg:(NSString *)roomID userID:(NSString *)userID nickName:(NSString *)nickName headPic:(NSString *)headPic textMsg:(NSString *)textMsg {
+- (void)onRecvRoomTextMsg:(NSString *)roomID userID:(NSString *)userID userName:(NSString *)userName userAvatar:(NSString *)userAvatar textMsg:(NSString *)textMsg {
     RTCMsgModel *msgMode = [[RTCMsgModel alloc] init];
     msgMode.type = RTCMsgModeTypeOther;
     msgMode.time = [[NSDate date] timeIntervalSince1970];
-    msgMode.userName = nickName;
+    msgMode.userName = userName;
     msgMode.userMsg = textMsg;
     
     [_msgListView appendMsg:msgMode];
@@ -650,7 +656,7 @@
     RTCMsgModel *msgMode = [[RTCMsgModel alloc] init];
     msgMode.type = RTCMsgModeTypeOneself;
     msgMode.time = [[NSDate date] timeIntervalSince1970];
-    msgMode.userName = _nickName;
+    msgMode.userName = _userName;
     msgMode.userMsg = textMsg;
     
     [_msgListView appendMsg:msgMode];

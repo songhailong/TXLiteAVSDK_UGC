@@ -72,7 +72,7 @@
 - (void)scrollToBottom {
     if (_canScrollToBottom) {
         NSUInteger n = MIN(_msgArray.count, [self numberOfRowsInSection:0]);
-        [self scrollToRowAtIndexPath:[NSIndexPath indexPathForRow:n - 1 inSection:0] atScrollPosition:UITableViewScrollPositionNone animated:NO];
+        [self scrollToRowAtIndexPath:[NSIndexPath indexPathForRow:n - 1 inSection:0] atScrollPosition:UITableViewScrollPositionBottom animated:NO];
     }
 }
 

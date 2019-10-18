@@ -80,7 +80,7 @@
     
     LiveRoomPusherViewController *vc = [[LiveRoomPusherViewController alloc] init];
     vc.roomName = roomName;
-    vc.nickName = _nickName;
+    vc.userName = _userName;
     vc.liveRoom = _liveRoom;
     _liveRoom.delegate = vc;
     [self.navigationController pushViewController:vc animated:YES];

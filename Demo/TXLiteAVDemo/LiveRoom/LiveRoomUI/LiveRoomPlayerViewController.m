@@ -12,12 +12,25 @@
 #import <AVFoundation/AVFoundation.h>
 #import "ColorMacro.h"
 #import "LiveRoomMsgListTableView.h"
+#import "LiveRoomPlayerItemView.h"
+
+typedef NS_ENUM(NSInteger, LinkMicStatus) {
+    LinkMicStatus_IDEL,          // 空闲状态
+    LinkMicStatus_REQUESTING,    // 请求连麦过程中
+    LinkMicStatus_BEING,         // 连麦中
+};
 
 @interface LiveRoomPlayerViewController () {
-    UIView                   *_playerView;
+    UIView                   *_playerView;     // 大画面(大主播)
+    UIView                   *_pusherView;     // 自己作为小主播时的推流画面
+    NSMutableDictionary      *_playerViewDic;  // 其他小主播的画面，[userID, view]
+    NSMutableDictionary      *_playerItemDic;  // 小主播的loading画面，[userID, playerItem]
     
     UIButton                 *_btnChat;
+    UIButton                 *_btnLinkMic;
     UIButton                 *_btnLog;
+    
+    LinkMicStatus            _linkMicStatus;   // 连麦状态
     
     BOOL                     _appIsInterrupt;
     BOOL                     _appIsInActive;
@@ -42,7 +55,8 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     
-    _playerView = [[UIView alloc] init];
+    _playerViewDic = [[NSMutableDictionary alloc] init];
+    _playerItemDic = [[NSMutableDictionary alloc] init];
     
     _appIsInterrupt = NO;
     _appIsInActive = NO;
@@ -98,7 +112,7 @@
     int ICON_SIZE = size.width / 10;
     
     float startSpace = 30;
-    float centerInterVal = (size.width - 2 * startSpace - ICON_SIZE) / 1;
+    float centerInterVal = (size.width - 2 * startSpace - ICON_SIZE) / 2;
     float iconY = size.height - ICON_SIZE / 2 - 10;
     
     // 聊天
@@ -109,9 +123,18 @@
     [_btnChat addTarget:self action:@selector(clickChat:) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:_btnChat];
     
+    // 请求连麦按钮
+    _linkMicStatus = LinkMicStatus_IDEL;
+    _btnLinkMic = [UIButton buttonWithType:UIButtonTypeCustom];
+    _btnLinkMic.center = CGPointMake(startSpace + ICON_SIZE/2 + centerInterVal * 1, iconY);
+    _btnLinkMic.bounds = CGRectMake(0, 0, ICON_SIZE, ICON_SIZE);
+    [_btnLinkMic setImage:[UIImage imageNamed:@"linkmic_start"] forState:UIControlStateNormal];
+    [_btnLinkMic addTarget:self action:@selector(clickLinkMic:) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:_btnLinkMic];
+    
     // log按钮
     _btnLog = [UIButton buttonWithType:UIButtonTypeCustom];
-    _btnLog.center = CGPointMake(startSpace + ICON_SIZE/2 + centerInterVal * 1, iconY);
+    _btnLog.center = CGPointMake(startSpace + ICON_SIZE/2 + centerInterVal * 2, iconY);
     _btnLog.bounds = CGRectMake(0, 0, ICON_SIZE, ICON_SIZE);
     [_btnLog setImage:[UIImage imageNamed:@"log"] forState:UIControlStateNormal];
     [_btnLog addTarget:self action:@selector(clickLog:) forControlEvents:UIControlEventTouchUpInside];
@@ -171,12 +194,39 @@
     [_msgInputView addSubview:_msgSendBtn];
     [self.view addSubview:_msgInputView];
     
-    // 播放主播画面
+    // 播放大主播画面
     _playerView = [[UIView alloc] initWithFrame:self.view.frame];
     [_playerView setBackgroundColor:UIColorFromRGB(0x262626)];
     [self.view insertSubview:_playerView atIndex:0];
+    
+    // 自己作为小主播时的推流画面
+    _pusherView = [[UIView alloc] initWithFrame:CGRectZero];
+    [_pusherView setBackgroundColor:UIColorFromRGB(0x262626)];
+    [self.view addSubview:_pusherView];
+    _pusherView.hidden = YES;
 }
 
+- (void)relayout {
+    // 重新布局自己的推流画面和其他小主播画面
+    int index = 1;
+    int originX = self.view.width - 110;
+    int originY = self.view.height - 250;
+    int videoViewWidth = 100;
+    int videoViewHeight = 150;
+    
+    _pusherView.frame = CGRectMake(originX, originY, videoViewWidth, videoViewHeight);
+    
+    for (id userID in _playerViewDic) {
+        UIView *playerView = [_playerViewDic objectForKey:userID];
+        playerView.frame = CGRectMake(originX, originY - videoViewHeight * index, videoViewWidth, videoViewHeight);
+        ++ index;
+        
+        LiveRoomPlayerItemView *playerItem = [_playerItemDic objectForKey:userID];
+        playerItem.frame = CGRectMake(playerView.frame.origin.x+ (playerView.width-16)/2,
+                                      playerView.frame.origin.y + (playerView.height-16)/2,
+                                      16, 16);
+    }
+}
 
 - (void)initRoomLogic {
     [_liveRoom enterRoom:_roomID withView:_playerView withCompletion:^(int errCode, NSString *errMsg) {
@@ -197,6 +247,43 @@
 // 聊天
 - (void)clickChat:(UIButton *)btn {
     [_msgInputTextField becomeFirstResponder];
+}
+
+- (void)clickLinkMic:(UIButton *)btn {
+    if (_linkMicStatus == LinkMicStatus_IDEL) {  // 空闲状态
+        _linkMicStatus = LinkMicStatus_REQUESTING;   // 请求连麦中
+        
+        [_liveRoom requestJoinPusher:10 withCompletion:^(int errCode, NSString *errMsg) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (errCode == 0) {
+                    _pusherView.hidden = NO;
+                    [_liveRoom startLocalPreview:_pusherView];
+                    [self relayout];
+                    
+                    _linkMicStatus = LinkMicStatus_BEING;  // 连麦中
+                    [btn setImage:[UIImage imageNamed:@"linkmic_stop"] forState:UIControlStateNormal];
+                    
+                    [_liveRoom joinPusher:^(int errCode, NSString *errMsg) {
+                        dispatch_async(dispatch_get_main_queue(), ^{
+                            if (errCode != 0) {
+                                [self alertTips:@"提示" msg:errMsg completion:^{
+                                    [self onKickout];
+                                }];
+                            }
+                        });
+                        
+                    }];
+                    
+                } else {
+                    _linkMicStatus = LinkMicStatus_IDEL;  // 空闲状态
+                    [self alertTips:@"提示" msg:errMsg completion:nil];
+                }
+            });
+        }];
+        
+    } else if (_linkMicStatus == LinkMicStatus_BEING) {  // 连麦中
+        [self onKickout];
+    }
 }
 
 // 设置log显示
@@ -284,14 +371,125 @@
     }];
 }
 
-- (void)onRecvRoomTextMsg:(NSString *)roomID userID:(NSString *)userID nickName:(NSString *)nickName headPic:(NSString *)headPic textMsg:(NSString *)textMsg {
+- (void)onRecvRoomTextMsg:(NSString *)roomID userID:(NSString *)userID userName:(NSString *)userName userAvatar:(NSString *)userAvatar textMsg:(NSString *)textMsg {
     LiveRoomMsgModel *msgMode = [[LiveRoomMsgModel alloc] init];
     msgMode.type = LiveRoomMsgModeTypeOther;
     msgMode.time = [[NSDate date] timeIntervalSince1970];
-    msgMode.userName = nickName;
+    msgMode.userName = userName;
     msgMode.userMsg = textMsg;
     
     [_msgListView appendMsg:msgMode];
+}
+
+/**
+   获取房间pusher列表的回调通知
+ */
+- (void)onGetPusherList:(NSArray<PusherInfo *> *)pusherInfoArray {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        // 播放其他小主播的画面
+        for (PusherInfo *pusherInfo in pusherInfoArray) {
+            UIView *playerView = [[UIView alloc] init];
+            [playerView setBackgroundColor:UIColorFromRGB(0x262626)];
+            [self.view addSubview:playerView];
+            
+            // loading界面
+            LiveRoomPlayerItemView *playerItem = [[LiveRoomPlayerItemView alloc] init];
+            [self.view addSubview:playerItem];
+            
+            [_playerViewDic setObject:playerView forKey:pusherInfo.userID];
+            [_playerItemDic setObject:playerItem forKey:pusherInfo.userID];
+            
+            // 重新布局
+            [self relayout];
+            [playerItem startLoadingAnimation];
+            
+            [_liveRoom addRemoteView:playerView withUserID:pusherInfo.userID playBegin:^{
+                LiveRoomPlayerItemView *playerItem = [_playerItemDic objectForKey:pusherInfo.userID];
+                [playerItem stopLoadingAnimation];
+                
+            } playError:^(int errCode, NSString *errMsg) {
+                [self onPusherQuit:pusherInfo];
+            }];
+
+            //LOG
+            [self appendLog:[NSString stringWithFormat:@"播放: userID[%@] userName[%@] playUrl[%@]", pusherInfo.userID, pusherInfo.userName, pusherInfo.playUrl]];
+        }
+    });
+}
+
+/**
+   新的pusher加入直播(连麦)
+ */
+- (void)onPusherJoin:(PusherInfo *)pusherInfo {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIView *playerView = [[UIView alloc] init];
+        [playerView setBackgroundColor:UIColorFromRGB(0x262626)];
+        [self.view addSubview:playerView];
+        
+        // loading界面
+        LiveRoomPlayerItemView *playerItem = [[LiveRoomPlayerItemView alloc] init];
+        [self.view addSubview:playerItem];
+        
+        [_playerViewDic setObject:playerView forKey:pusherInfo.userID];
+        [_playerItemDic setObject:playerItem forKey:pusherInfo.userID];
+        
+        // 重新布局
+        [self relayout];
+        [playerItem startLoadingAnimation];
+        
+        [_liveRoom addRemoteView:playerView withUserID:pusherInfo.userID playBegin:^{
+            LiveRoomPlayerItemView *playerItem = [_playerItemDic objectForKey:pusherInfo.userID];
+            [playerItem stopLoadingAnimation];
+            
+        } playError:^(int errCode, NSString *errMsg) {
+            [self onPusherQuit:pusherInfo];
+        }];
+
+    });
+}
+
+/**
+   pusher退出直播(连麦)的通知
+ */
+- (void)onPusherQuit:(PusherInfo *)pusherInfo {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIView *playerView = [_playerViewDic objectForKey:pusherInfo.userID];
+        [playerView removeFromSuperview];
+        [_playerViewDic removeObjectForKey:pusherInfo.userID];
+        
+        LiveRoomPlayerItemView *playerItem = [_playerItemDic objectForKey:pusherInfo.userID];
+        [playerItem removeFromSuperview];
+        [_playerItemDic removeObjectForKey:pusherInfo.userID];
+        
+        [self relayout];
+    });
+}
+
+/**
+   小主播收到被大主播踢出连麦的通知
+ */
+- (void)onKickout {
+    // UI及状态
+    _pusherView.hidden = YES;
+    [_btnLinkMic setImage:[UIImage imageNamed:@"linkmic_start"] forState:UIControlStateNormal];
+    _linkMicStatus = LinkMicStatus_IDEL;
+    
+    // 关闭本地推流和预览，并退出pusher房间
+    [_liveRoom stopLocalPreview];
+    [_liveRoom quitPusher:^(int errCode, NSString *errMsg) {
+        
+    }];
+    
+    // 关闭播放器画面
+    for (id userID in _playerViewDic) {
+        UIView *playerView = [_playerViewDic objectForKey:userID];
+        [playerView removeFromSuperview];
+        
+        LiveRoomPlayerItemView *playerItem = [_playerItemDic objectForKey:userID];
+        [playerItem removeFromSuperview];
+    }
+    [_playerViewDic removeAllObjects];
+    [_playerItemDic removeAllObjects];
 }
 
 - (void)alertTips:(NSString *)title msg:(NSString *)msg completion:(void(^)())completion {
@@ -384,7 +582,7 @@
     LiveRoomMsgModel *msgMode = [[LiveRoomMsgModel alloc] init];
     msgMode.type = LiveRoomMsgModeTypeOther;
     msgMode.time = [[NSDate date] timeIntervalSince1970];
-    msgMode.userName = _nickName;
+    msgMode.userName = _userName;
     msgMode.userMsg = textMsg;
     
     [_msgListView appendMsg:msgMode];
